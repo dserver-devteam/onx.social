@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="N.Social - A modern social media platform with dark theme and blue accents">
+    <meta name="keywords" content="social media, posts, networking, n.social">
+    <title>N.Social - Connect and Share</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/index.css">
+</head>
+
+<body>
+    <!-- Main Container -->
+    <div class="app-container">
+        <!-- Left Sidebar - Navigation -->
+        <aside class="sidebar">
+            <div class="sidebar-content">
+                <!-- Logo -->
+                <div class="logo">
+                    <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+                        <circle cx="20" cy="20" r="18" stroke="currentColor" stroke-width="3" />
+                        <path d="M15 20L18 23L25 16" stroke="currentColor" stroke-width="3" stroke-linecap="round"
+                            stroke-linejoin="round" />
+                    </svg>
+                    <span class="logo-text">n.social</span>
+                </div>
+
+                <!-- Navigation Menu -->
+                <nav class="nav-menu">
+                    <a href="#" class="nav-item active">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                            <path
+                                d="M3 9L12 2L21 9V20C21 20.5304 20.7893 21.0391 20.4142 21.4142C20.0391 21.7893 19.5304 22 19 22H5C4.46957 22 3.96086 21.7893 3.58579 21.4142C3.21071 21.0391 3 20.5304 3 20V9Z"
+                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                        <span>Home</span>
+                    </a>
+                    <a href="#" class="nav-item">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                            <circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="2" />
+                            <path d="M21 21L16.65 16.65" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" />
+                        </svg>
+                        <span>Explore</span>
+                    </a>
+                    <a href="#" class="nav-item">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                            <path
+                                d="M18 8C18 6.4087 17.3679 4.88258 16.2426 3.75736C15.1174 2.63214 13.5913 2 12 2C10.4087 2 8.88258 2.63214 7.75736 3.75736C6.63214 4.88258 6 6.4087 6 8C6 15 3 17 3 17H21C21 17 18 15 18 8Z"
+                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                        <span>Notifications</span>
+                    </a>
+                    <a href="#" class="nav-item">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                            <path
+                                d="M17 21V19C17 17.9391 16.5786 16.9217 15.8284 16.1716C15.0783 15.4214 14.0609 15 13 15H5C3.93913 15 2.92172 15.4214 2.17157 16.1716C1.42143 16.9217 1 17.9391 1 19V21"
+                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                            <circle cx="9" cy="7" r="4" stroke="currentColor" stroke-width="2" />
+                            <path
+                                d="M23 21V19C22.9993 18.1137 22.7044 17.2528 22.1614 16.5523C21.6184 15.8519 20.8581 15.3516 20 15.13"
+                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                            <path
+                                d="M16 3.13C16.8604 3.35031 17.623 3.85071 18.1676 4.55232C18.7122 5.25392 19.0078 6.11683 19.0078 7.005C19.0078 7.89318 18.7122 8.75608 18.1676 9.45769C17.623 10.1593 16.8604 10.6597 16 10.88"
+                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                        <span>Social</span>
+                    </a>
+                    <a href="#" class="nav-item">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                            <path
+                                d="M19 21L12 16L5 21V5C5 4.46957 5.21071 3.96086 5.58579 3.58579C5.96086 3.21071 6.46957 3 7 3H17C17.5304 3 18.0391 3.21071 18.4142 3.58579C18.7893 3.96086 19 4.46957 19 5V21Z"
+                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                        <span>Bookmarks</span>
+                    </a>
+                    <a href="#" class="nav-item">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                            <path
+                                d="M20 21V19C20 17.9391 19.5786 16.9217 18.8284 16.1716C18.0783 15.4214 17.0609 15 16 15H8C6.93913 15 5.92172 15.4214 5.17157 16.1716C4.42143 16.9217 4 17.9391 4 19V21"
+                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                            <circle cx="12" cy="7" r="4" stroke="currentColor" stroke-width="2" />
+                        </svg>
+                        <span>Profile</span>
+                    </a>
+                    <a href="#" class="nav-item" id="openSettingsBtn">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                            <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2" />
+                            <path
+                                d="M12 1V3M12 21V23M4.22 4.22L5.64 5.64M18.36 18.36L19.78 19.78M1 12H3M21 12H23M4.22 19.78L5.64 18.36M18.36 5.64L19.78 4.22"
+                                stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                        </svg>
+                        <span>Settings</span>
+                    </a>
+                </nav>
+
+                <!-- Post Button -->
+                <button class="btn-post" id="openComposeBtn">Post</button>
+
+                <!-- Guest Actions (Hidden by default, shown if no user) -->
+                <div id="guestActions" style="display: none; flex-direction: column; gap: 10px; margin-top: 20px;">
+                    <a href="/login" class="btn-post"
+                        style="text-align: center; text-decoration: none; background: transparent; border: 1px solid var(--color-primary); color: var(--color-primary);">Sign
+                        In</a>
+                    <a href="/register" class="btn-post" style="text-align: center; text-decoration: none;">Sign Up</a>
+                </div>
+
+                <!-- User Profile -->
+                <div class="user-profile sidebar-profile">
+                    <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=CurrentUser" alt="User"
+                        class="user-avatar">
+                    <div class="user-info">
+                        <div class="user-name">You</div>
+                        <div class="user-handle">@you</div>
+                    </div>
+                    <div class="logout-btn" id="logoutBtn" title="Logout">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                            <polyline points="16 17 21 12 16 7"></polyline>
+                            <line x1="21" y1="12" x2="9" y2="12"></line>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Context Menu for User Panel -->
+        <div id="userContextMenu" class="context-menu" style="display: none;">
+            <div class="context-menu-item" id="contextSettings">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2" />
+                    <path
+                        d="M12 1V3M12 21V23M4.22 4.22L5.64 5.64M18.36 18.36L19.78 19.78M1 12H3M21 12H23M4.22 19.78L5.64 18.36M18.36 5.64L19.78 4.22"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                </svg>
+                <span>Settings</span>
+            </div>
+            <div class="context-menu-item" id="contextLogout">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                    <polyline points="16 17 21 12 16 7"></polyline>
+                    <line x1="21" y1="12" x2="9" y2="12"></line>
+                </svg>
+                <span>Logout</span>
+            </div>
+            <div class="context-menu-item" id="contextRegister" style="display: none;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="8.5" cy="7" r="4"></circle>
+                    <line x1="20" y1="8" x2="20" y2="14"></line>
+                    <line x1="23" y1="11" x2="17" y2="11"></line>
+                </svg>
+                <span>Sign Up</span>
+            </div>
+        </div>
+
+        <!-- Main Feed -->
+        <main class="main-feed">
+            <!-- Header -->
+            <header class="main-header">
+                <h1 class="header-title" style="display: none;">Home</h1>
+            </header>
+            <!-- Social Page (Friends Hub) -->
+            <div id="socialPage" class="social-page" style="display: none;">
+                <div class="social-container-vertical">
+                    <!-- Friends Status Grid -->
+                    <section class="friends-feed-section">
+                        <div class="feed-header"
+                            style="display: flex; justify-content: space-between; align-items: center;">
+                            <h2>Stories</h2>
+                            <!-- Post button removed as "My Status" card handles it -->
+                        </div>
+                        <div id="statusGrid" class="status-grid">
+                            <!-- Status cards will be loaded here -->
+                            <div class="loading">Loading stories...</div>
+                        </div>
+                    </section>
+                </div>
+            </div>
+            <div class="feed-tabs">
+                <div class="feed-tab active" data-feed="foryou">For You</div>
+            </div>
+
+            <!-- Quick Compose -->
+            <div class="compose-box">
+                <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=CurrentUser" alt="User"
+                    class="compose-avatar">
+                <div class="compose-input-wrapper" style="position: relative;">
+                    <textarea id="quickComposeInput" class="compose-input" placeholder="What's happening?"
+                        maxlength="280"></textarea>
+                    <div class="autocomplete-dropdown" id="quickAutocomplete"></div>
+                    <div id="quickMediaPreview" class="media-preview" style="display: none;">
+                        <img id="quickMediaPreviewImg"
+                            style="max-width: 100%; border-radius: 12px; margin-top: 12px; display: none;">
+                        <video id="quickMediaPreviewVid" controls
+                            style="max-width: 100%; border-radius: 12px; margin-top: 12px; display: none;"></video>
+                        <button class="remove-media-btn" id="quickRemoveMedia">✕</button>
+                    </div>
+                    <div class="compose-actions">
+                        <div class="media-upload-btn">
+                            <input type="file" id="quickMediaInput" accept="image/*,video/*" style="display: none;">
+                            <label for="quickMediaInput"
+                                style="cursor: pointer; display: flex; align-items: center; gap: 8px; color: var(--color-primary);">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                                    <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor"
+                                        stroke-width="2" />
+                                    <circle cx="8.5" cy="8.5" r="1.5" fill="currentColor" />
+                                    <path d="M21 15L16 10L5 21" stroke="currentColor" stroke-width="2" />
+                                </svg>
+                            </label>
+                        </div>
+                        <div class="char-counter" id="quickCharCounter">0 / 280</div>
+                        <button class="btn-post-small" id="quickPostBtn">Post</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Posts Feed -->
+            <div class="posts-feed" id="postsFeed">
+                <!-- Posts will be loaded here dynamically -->
+                <div class="loading">Loading posts...</div>
+            </div>
+        </main>
+
+        <!-- Right Sidebar - Widgets -->
+        <aside class="widgets">
+            <!-- Search -->
+            <div class="search-box">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                    <circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="2" />
+                    <path d="M21 21L16.65 16.65" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                </svg>
+                <input type="text" placeholder="Search N.Social" class="search-input">
+            </div>
+
+            <!-- Trending Topics -->
+            <div class="widget">
+                <h2 class="widget-title">Trends for you</h2>
+                <div id="trendingList">
+                    <!-- Trending topics will be loaded here -->
+                </div>
+            </div>
+
+            <!-- Who to Follow -->
+            <div class="widget">
+                <h2 class="widget-title">Who to follow</h2>
+                <div class="follow-suggestions">
+                    <div class="follow-item">
+                        <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=User1" alt="User"
+                            class="follow-avatar">
+                        <div class="follow-info">
+                            <div class="follow-name">Sarah Chen</div>
+                            <div class="follow-handle">@sarahchen</div>
+                        </div>
+                        <button class="btn-follow">Follow</button>
+                    </div>
+                    <div class="follow-item">
+                        <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=User2" alt="User"
+                            class="follow-avatar">
+                        <div class="follow-info">
+                            <div class="follow-name">Mike Ross</div>
+                            <div class="follow-handle">@mikeross</div>
+                        </div>
+                        <button class="btn-follow">Follow</button>
+                    </div>
+                    <div class="follow-item">
+                        <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=User3" alt="User"
+                            class="follow-avatar">
+                        <div class="follow-info">
+                            <div class="follow-name">Emma Wilson</div>
+                            <div class="follow-handle">@emmaw</div>
+                        </div>
+                        <button class="btn-follow">Follow</button>
+                    </div>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <!-- Compose Modal -->
+    <div class="modal" id="composeModal">
+        <div class="modal-overlay" id="modalOverlay"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <button class="modal-close" id="closeModalBtn">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                        <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=CurrentUser" alt="User"
+                    class="compose-avatar">
+                <div class="compose-input-wrapper" style="position: relative;">
+                    <textarea id="modalComposeInput" class="compose-input modal-compose-input"
+                        placeholder="What's happening?" maxlength="280"></textarea>
+                    <div class="autocomplete-dropdown" id="modalAutocomplete"></div>
+                    <div id="modalMediaPreview" class="media-preview" style="display: none;">
+                        <img id="modalMediaPreviewImg"
+                            style="max-width: 100%; border-radius: 12px; margin-top: 12px; display: none;">
+                        <video id="modalMediaPreviewVid" controls
+                            style="max-width: 100%; border-radius: 12px; margin-top: 12px; display: none;"></video>
+                        <button class="remove-media-btn" id="modalRemoveMedia">✕</button>
+                    </div>
+                    <div class="compose-actions">
+                        <div class="media-upload-btn">
+                            <input type="file" id="modalMediaInput" accept="image/*,video/*" style="display: none;">
+                            <label for="modalMediaInput"
+                                style="cursor: pointer; display: flex; align-items: center; gap: 8px; color: var(--color-primary);">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                                    <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor"
+                                        stroke-width="2" />
+                                    <circle cx="8.5" cy="8.5" r="1.5" fill="currentColor" />
+                                    <path d="M21 15L16 10L5 21" stroke="currentColor" stroke-width="2" />
+                                </svg>
+                            </label>
+                        </div>
+                        <div class="char-counter" id="modalCharCounter">0 / 280</div>
+                        <button class="btn-post-small" id="modalPostBtn">Post</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reply Modal -->
+    <div class="modal" id="replyModal">
+        <div class="modal-overlay" id="replyModalOverlay"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <button class="modal-close" id="closeReplyModalBtn">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                        <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <!-- Original post will be shown here -->
+                <div id="replyToPost" class="reply-to-post"></div>
+
+                <!-- Reply compose -->
+                <div style="display: flex; gap: 12px; margin-top: 16px;">
+                    <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=CurrentUser" alt="User"
+                        class="compose-avatar">
+                    <div class="compose-input-wrapper" style="flex: 1; position: relative;">
+                        <textarea id="replyInput" class="compose-input modal-compose-input"
+                            placeholder="Post your reply" maxlength="280"></textarea>
+                        <div class="autocomplete-dropdown" id="replyAutocomplete"></div>
+                        <div id="replyMediaPreview" class="media-preview" style="display: none;">
+                            <img id="replyMediaPreviewImg"
+                                style="max-width: 100%; border-radius: 12px; margin-top: 12px; display: none;">
+                            <video id="replyMediaPreviewVid" controls
+                                style="max-width: 100%; border-radius: 12px; margin-top: 12px; display: none;"></video>
+                            <button class="remove-media-btn" id="replyRemoveMedia">✕</button>
+                        </div>
+                        <div class="compose-actions">
+                            <div class="media-upload-btn">
+                                <input type="file" id="replyMediaInput" accept="image/*,video/*" style="display: none;">
+                                <label for="replyMediaInput"
+                                    style="cursor: pointer; display: flex; align-items: center; gap: 8px; color: var(--color-primary);">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                                        <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor"
+                                            stroke-width="2" />
+                                        <circle cx="8.5" cy="8.5" r="1.5" fill="currentColor" />
+                                        <path d="M21 15L16 10L5 21" stroke="currentColor" stroke-width="2" />
+                                    </svg>
+                                </label>
+                            </div>
+                            <div class="char-counter" id="replyCharCounter">0 / 280</div>
+                            <button class="btn-post-small" id="replyPostBtn">Reply</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div class="modal" id="settingsModal">
+        <div class="modal-overlay" id="settingsModalOverlay"></div>
+        <div class="modal-content" style="max-width: 700px;">
+            <div class="modal-header">
+                <h3 class="modal-title">Settings</h3>
+                <button class="modal-close" id="closeSettingsBtn">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                        <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body" style="padding: 0;">
+                <!-- Settings Tabs -->
+                <div class="settings-tabs">
+                    <div class="settings-tab active" data-tab="account">Account</div>
+                </div>
+
+                <!-- Account Tab -->
+                <div class="settings-tab-content active" id="accountTab">
+                    <div style="padding: var(--spacing-xl);">
+                        <h4 style="margin-bottom: var(--spacing-lg); font-size: var(--font-size-lg);">Account Settings
+                        </h4>
+
+                        <div class="form-group">
+                            <label for="settingsEmail">Email</label>
+                            <input type="email" id="settingsEmail" class="form-input" placeholder="your@email.com">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="settingsUsername">Username</label>
+                            <input type="text" id="settingsUsername" class="form-input" placeholder="username"
+                                maxlength="30">
+                            <small style="color: var(--color-text-secondary); font-size: var(--font-size-xs);">
+                                Changing username will update your @mention
+                            </small>
+                        </div>
+
+                        <hr
+                            style="border: none; border-top: 1px solid var(--color-border); margin: var(--spacing-xl) 0;">
+
+                        <h4 style="margin-bottom: var(--spacing-lg); font-size: var(--font-size-lg);">Change Password
+                        </h4>
+
+                        <div class="form-group">
+                            <label for="settingsCurrentPassword">Current Password</label>
+                            <input type="password" id="settingsCurrentPassword" class="form-input"
+                                placeholder="Enter current password">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="settingsNewPassword">New Password</label>
+                            <input type="password" id="settingsNewPassword" class="form-input"
+                                placeholder="Enter new password">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="settingsConfirmPassword">Confirm New Password</label>
+                            <input type="password" id="settingsConfirmPassword" class="form-input"
+                                placeholder="Confirm new password">
+                        </div>
+
+                        <button class="btn-post" id="saveAccountBtn"
+                            style="width: 100%; margin-top: var(--spacing-md);">
+                            Save Account Settings
+                        </button>
+
+                        <hr
+                            style="border: none; border-top: 1px solid var(--color-border); margin: var(--spacing-xl) 0;">
+
+                        <h4 style="margin-bottom: var(--spacing-lg); font-size: var(--font-size-lg);">Data & Privacy
+                        </h4>
+
+                        <div
+                            style="background: rgba(255, 255, 255, 0.03); border-radius: var(--radius-md); padding: var(--spacing-md); margin-bottom: var(--spacing-lg);">
+                            <h5 style="margin-bottom: var(--spacing-xs); color: var(--color-text-primary);">Download My
+                                Data</h5>
+                            <p
+                                style="color: var(--color-text-secondary); font-size: var(--font-size-sm); margin-bottom: var(--spacing-md);">
+                                Request a copy of your data (posts, media, profile info). We will email you a download
+                                link valid for 7 days.
+                            </p>
+                            <button class="btn-post" id="downloadDataBtn"
+                                style="background: transparent; border: 1px solid var(--color-primary); color: var(--color-primary); width: 100%;">
+                                Request Data Export
+                            </button>
+                        </div>
+
+                        <h4 style="margin-bottom: var(--spacing-lg); font-size: var(--font-size-lg); color: #ef4444;">
+                            Danger Zone</h4>
+
+                        <div
+                            style="border: 1px solid #ef4444; border-radius: var(--radius-md); padding: var(--spacing-md);">
+                            <h5 style="margin-bottom: var(--spacing-xs); color: #ef4444;">Delete Account</h5>
+                            <p
+                                style="color: var(--color-text-secondary); font-size: var(--font-size-sm); margin-bottom: var(--spacing-md);">
+                                Permanently delete your account and all your content. This action cannot be undone.
+                            </p>
+                            <button class="btn-post" id="deleteAccountBtn"
+                                style="background: #ef4444; color: white; width: 100%; border: none;">
+                                Delete Account
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div class="modal" id="confirmModal">
+        <div class="modal-overlay" id="confirmModalOverlay"></div>
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header">
+                <h3 class="modal-title" id="confirmModalTitle">Confirm Action</h3>
+                <button class="modal-close" id="closeConfirmModalBtn">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                        <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p id="confirmModalMessage"
+                    style="color: var(--color-text-secondary); margin-bottom: 20px; font-size: 15px; line-height: 1.5;">
+                </p>
+                <div class="modal-actions" style="display: flex; gap: 10px; justify-content: flex-end;">
+                    <button class="btn-post" id="confirmModalCancelBtn"
+                        style="background: transparent; border: 1px solid var(--glass-border); color: var(--color-text-primary);">Cancel</button>
+                    <button class="btn-post" id="confirmModalConfirmBtn">Confirm</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Post Menu Dropdown -->
+    <div id="postMenu" class="post-menu" style="display: none;">
+        <div class="post-menu-item" id="reportPostMenuItem">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path
+                    d="M10.29 3.86L1.82 18C1.64537 18.3024 1.55296 18.6453 1.55199 18.9945C1.55101 19.3437 1.64151 19.6871 1.81445 19.9905C1.98738 20.2939 2.23675 20.5467 2.53773 20.7239C2.83871 20.9011 3.18082 20.9962 3.53 21H20.47C20.8192 20.9962 21.1613 20.9011 21.4623 20.7239C21.7633 20.5467 22.0126 20.2939 22.1856 19.9905C22.3585 19.6871 22.449 19.3437 22.448 18.9945C22.447 18.6453 22.3546 18.3024 22.18 18L13.71 3.86C13.5317 3.56611 13.2807 3.32312 12.9812 3.15448C12.6817 2.98585 12.3437 2.89725 12 2.89725C11.6563 2.89725 11.3183 2.98585 11.0188 3.15448C10.7193 3.32312 10.4683 3.56611 10.29 3.86Z" />
+                <path d="M12 9V13" />
+                <path d="M12 17H12.01" />
+            </svg>
+            <span>Report post</span>
+        </div>
+        <div class="post-menu-item" id="muteUserMenuItem">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M11 5L6 9H2V15H6L11 19V5Z" />
+                <line x1="23" y1="9" x2="17" y2="15" />
+                <line x1="17" y1="9" x2="23" y2="15" />
+            </svg>
+            <span>Mute @<span id="muteUsername"></span></span>
+        </div>
+        <div class="post-menu-item" id="copyLinkMenuItem">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path
+                    d="M10 13C10.4295 13.5741 10.9774 14.0491 11.6066 14.3929C12.2357 14.7367 12.9315 14.9411 13.6467 14.9923C14.3618 15.0435 15.0796 14.9403 15.7513 14.6897C16.4231 14.4392 17.0331 14.047 17.54 13.54L20.54 10.54C21.4508 9.59695 21.9548 8.33394 21.9434 7.02296C21.932 5.71198 21.4061 4.45791 20.4791 3.53087C19.5521 2.60383 18.298 2.07799 16.987 2.0666C15.676 2.0552 14.413 2.55918 13.47 3.46997L11.75 5.17997" />
+                <path
+                    d="M14 11C13.5705 10.4259 13.0226 9.95083 12.3934 9.60707C11.7642 9.26331 11.0685 9.05889 10.3533 9.00768C9.63819 8.95646 8.92037 9.05965 8.24861 9.31023C7.57685 9.5608 6.96684 9.95303 6.45996 10.46L3.45996 13.46C2.54917 14.403 2.04519 15.666 2.05659 16.977C2.06798 18.288 2.59382 19.5421 3.52086 20.4691C4.44791 21.3961 5.70197 21.922 7.01295 21.9334C8.32393 21.9448 9.58694 21.4408 10.53 20.53L12.24 18.82" />
+            </svg>
+            <span>Copy link</span>
+        </div>
+        <div class="post-menu-item" id="deletePostMenuItem" style="display: none; color: #ef4444;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            </svg>
+            <span>Delete post</span>
+        </div>
+        <div class="post-menu-item" id="explainAiMenuItem">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 2a10 10 0 1 0 10 10H12V2z"></path>
+                <path d="M12 2a10 10 0 0 1 10 10"></path>
+                <path d="M2.05 10.5a10 10 0 0 1 19.9 0"></path>
+            </svg>
+            <span>Explain with AI</span>
+        </div>
+    </div>
+
+    <!-- Report Modal -->
+    <div id="reportModal" class="modal">
+        <div class="modal-overlay" id="reportModalOverlay"></div>
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3>Report Post</h3>
+                <button class="modal-close" id="closeReportModalBtn">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                        <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                            stroke-linejoin="round" />
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body" style="flex-direction: column;">
+                <div style="margin-bottom: var(--spacing-lg);">
+                    <label for="reportReason"
+                        style="display: block; margin-bottom: var(--spacing-sm); font-weight: 600;">Reason for
+                        report</label>
+                    <select id="reportReason"
+                        style="width: 100%; padding: var(--spacing-md); background: var(--color-bg-tertiary); border: 1px solid var(--color-border); border-radius: var(--radius-md); color: var(--color-text-primary); font-size: var(--font-size-base);">
+                        <option value="spam">Spam</option>
+                        <option value="harassment">Harassment or bullying</option>
+                        <option value="hate_speech">Hate speech</option>
+                        <option value="violence">Violence or threats</option>
+                        <option value="misinformation">Misinformation</option>
+                        <option value="inappropriate">Inappropriate content</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+                <div style="margin-bottom: var(--spacing-lg);">
+                    <label for="reportDescription"
+                        style="display: block; margin-bottom: var(--spacing-sm); font-weight: 600;">Additional details
+                        (optional)</label>
+                    <textarea id="reportDescription" placeholder="Provide more context about this report..."
+                        style="width: 100%; min-height: 100px; padding: var(--spacing-md); background: var(--color-bg-tertiary); border: 1px solid var(--color-border); border-radius: var(--radius-md); color: var(--color-text-primary); font-size: var(--font-size-base); font-family: var(--font-family); resize: vertical;"></textarea>
+                </div>
+                <button class="btn-post" id="submitReportBtn" style="width: 100%;">
+                    Submit Report
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mobile FAB -->
+    <div class="mobile-fab" onclick="openComposeModal()">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 5v14M5 12h14" />
+        </svg>
+    </div>
+
+
+
+
+
+    <!-- Status Reveal Modal -->
+    <div id="statusModal" class="status-modal">
+        <button class="status-modal-close" onclick="closeStatusModal()">×</button>
+        <div class="status-modal-content">
+            <div class="status-modal-header">
+                <img id="statusModalAvatar" src="" alt="" class="status-user-avatar">
+                <div>
+                    <div id="statusModalName" style="font-weight: 600;"></div>
+                    <div id="statusModalTime" style="font-size: 12px; opacity: 0.8;"></div>
+                </div>
+            </div>
+            <div class="status-modal-body" id="statusModalBody">
+                <!-- Content goes here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Explanation Modal -->
+    <div id="aiExplainModal" class="modal">
+        <div class="modal-overlay" onclick="closeAiModal()"></div>
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div
+                        style="width: 32px; height: 32px; background: linear-gradient(135deg, #6366f1, #8b5cf6); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path d="M12 2a10 10 0 1 0 10 10H12V2z"></path>
+                            <path d="M12 2a10 10 0 0 1 10 10"></path>
+                            <path d="M2.05 10.5a10 10 0 0 1 19.9 0"></path>
+                        </svg>
+                    </div>
+                    <h3>AI Explanation</h3>
+                </div>
+                <button class="modal-close" onclick="closeAiModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <div id="aiLoading" style="display: none; text-align: center; padding: 20px;">
+                    <div class="loading-spinner"></div>
+                    <p style="margin-top: 10px; color: var(--color-text-secondary);">Asking AI to explain...</p>
+                </div>
+                <div id="aiResult" style="line-height: 1.6; color: var(--color-text-primary); font-size: 1.1em;"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/app.js?v=9"></script>
+</body>
+
+</html>

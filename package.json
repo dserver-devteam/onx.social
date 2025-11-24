@@ -1,0 +1,38 @@
+{
+  "name": "n-social",
+  "version": "1.0.0",
+  "description": "A modern social media platform with dark theme and blue accents",
+  "main": "server.js",
+  "scripts": {
+    "start": "concurrently \"node server.js\" \"node admin-server.js\" \"node support-server.js\" \"node llm-dashboard-server.js\" \"node llm-processor.js\"",
+    "dev": "concurrently \"node server.js\" \"node admin-server.js\" \"node support-server.js\" \"node llm-dashboard-server.js\" \"node llm-processor.js\"",
+    "dev:main": "node server.js",
+    "dev:admin": "node admin-server.js",
+    "dev:support": "node support-server.js",
+    "dev:llm": "node llm-dashboard-server.js",
+    "dev:processor": "node llm-processor.js"
+  },
+  "keywords": [
+    "social",
+    "media",
+    "postgres",
+    "express"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.937.0",
+    "@aws-sdk/lib-storage": "^3.937.0",
+    "@aws-sdk/s3-request-presigner": "^3.937.0",
+    "axios": "^1.13.2",
+    "bcrypt": "^6.0.0",
+    "body-parser": "^1.20.2",
+    "concurrently": "^8.2.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "multer": "^2.0.2",
+    "nodemailer": "^6.10.1",
+    "pg": "^8.11.3"
+  }
+}
