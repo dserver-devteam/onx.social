@@ -1,5 +1,4 @@
 // API Base URL
-let currentFeed = 'foryou'; // 'foryou' or 'latest'
 const API_BASE = '/api';
 
 // Current user
@@ -66,71 +65,10 @@ window.closeAiModal = function () {
     document.getElementById('aiExplainModal').classList.remove('active');
 };
 
-// ===== SMART RECOMMENDATIONS - VIEW TRACKING =====
 
-// Track viewed posts
-const viewedPosts = new Set();
-let viewedPostsCount = 0;
-let totalPostsLoaded = 0;
+// ===== REMOVED: VIEW TRACKING AND RECOMMENDATIONS =====
+// All view tracking, interest profiling, and recommendation logic has been removed
 
-function initViewTracking() {
-    if (!currentUser) return;
-
-    // Mark all currently visible posts as viewed immediately
-    document.querySelectorAll('.post-card').forEach(card => {
-        const postId = card.dataset.postId;
-        if (postId && !viewedPosts.has(postId)) {
-            viewedPosts.add(postId);
-            viewedPostsCount++;
-            // Mark as viewed immediately (aggressive mode)
-            markPostAsViewed(postId);
-        }
-    });
-
-    // Auto-refresh removed - it was causing infinite reload loops
-    // Users can manually refresh to see new posts
-}
-
-async function markPostAsViewed(postId) {
-    if (!currentUser) return;
-
-    console.log('📍 Marking post as viewed:', postId);
-
-    try {
-        await fetch(`${API_BASE}/posts/${postId}/mark-viewed`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                user_id: currentUser.id
-            })
-        });
-        console.log('✅ Post marked as viewed:', postId);
-    } catch (error) {
-        console.error('Error marking post as viewed:', error);
-    }
-}
-
-async function updateUserPreferences(postId, interactionType) {
-    if (!currentUser) return;
-
-    try {
-        await fetch(`${API_BASE}/preferences/update`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                user_id: currentUser.id,
-                post_id: postId,
-                interaction_type: interactionType
-            })
-        });
-    } catch (error) {
-        console.error('Error updating preferences:', error);
-    }
-}
 
 // State
 let posts = [];
@@ -747,9 +685,7 @@ async function loadPosts(append = false) {
         // Add current_user_id to enable smart recommendations (view exclusion)
         if (currentUser) {
             url += `&current_user_id=${currentUser.id}`;
-        }
-
-        if (currentFeed === 'foryou' && currentUser) {
+            // Use the algorithm-powered feed for logged-in users
             url = `${API_BASE}/feed/recommended?user_id=${currentUser.id}&limit=${POSTS_PER_PAGE}&offset=${postsOffset}`;
         }
 
@@ -780,9 +716,7 @@ async function loadPosts(append = false) {
             // Replace posts (initial load or refresh)
             posts = newPosts;
 
-            // Reset viewed counter when loading fresh feed
-            viewedPostsCount = 0;
-            totalPostsLoaded = newPosts.length;
+            // Counters removed
 
             if (posts.length === 0) {
                 feedContainer.innerHTML = `
@@ -797,17 +731,12 @@ async function loadPosts(append = false) {
             feedContainer.innerHTML = posts.map(post => createPostHTML(post)).join('');
             attachPostEventListeners();
 
-            // Initialize view tracking for newly loaded posts
-            initViewTracking();
+            // View tracking removed
         }
 
         // Update offset for next load
         postsOffset += newPosts.length;
 
-        // Update total posts loaded
-        if (append) {
-            totalPostsLoaded += newPosts.length;
-        }
 
     } catch (error) {
         console.error('Error loading posts:', error);
@@ -2766,22 +2695,9 @@ document.addEventListener('DOMContentLoaded', () => {
         saveProfileBtn.addEventListener('click', saveProfile);
     }
 
-    // Feed tabs
-    const feedTabs = document.querySelectorAll('.feed-tab');
-    feedTabs.forEach(tab => {
-        tab.addEventListener('click', () => {
-            // Update active state
-            feedTabs.forEach(t => t.classList.remove('active'));
-            tab.classList.add('active');
 
-            // Update current feed
-            currentFeed = tab.dataset.feed;
+    // Feed tabs removed - only one feed now
 
-            // Reset pagination and reload posts
-            resetPagination();
-            loadPosts();
-        });
-    });
 
     // Save account button
     const saveAccountBtn = document.getElementById('saveAccountBtn');
@@ -3646,7 +3562,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Export functions
 window.renderSocialPage = renderSocialPage;
-window.deleteSocialPost = deleteSocialPost;
+
 
 
 

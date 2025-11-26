@@ -4,7 +4,7 @@
   "description": "A modern social media platform with dark theme and blue accents",
   "main": "server.js",
   "scripts": {
-    "start": "concurrently \"node server.js\" \"node admin-server.js\" \"node support-server.js\" \"node llm-dashboard-server.js\" \"node llm-processor.js\"",
+    "start": "concurrently \"node server.js\" \"node admin-server.js\" \"node support-server.js\"",
     "dev": "concurrently \"node server.js\" \"node admin-server.js\" \"node support-server.js\" \"node llm-dashboard-server.js\" \"node llm-processor.js\"",
     "dev:main": "node server.js",
     "dev:admin": "node admin-server.js",

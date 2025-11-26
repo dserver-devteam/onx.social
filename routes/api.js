@@ -117,19 +117,14 @@ router.get('/posts', async (req, res) => {
             const result = await pool.query(query, [user_id, limitNum, offsetNum]);
             posts = result.rows;
         } else if (current_user_id) {
-            // Home feed - SQL-based Theme Matching Feed
+            // Home feed - Simple chronological feed
             const query = `
-                WITH UserInterests AS (
-                    SELECT COALESCE(interest_profile, '{}'::jsonb) as interest_profile 
-                    FROM users WHERE id = $1
-                )
                 SELECT 
                     p.id,
                     p.content,
                     p.media_url,
                     p.media_type,
                     p.created_at,
-                    p.themes,
                     u.id as user_id,
                     u.username,
                     u.display_name,
@@ -139,35 +134,20 @@ router.get('/posts', async (req, res) => {
                     COUNT(DISTINCT rep.id) as reply_count,
                     EXISTS(SELECT 1 FROM likes WHERE post_id = p.id AND user_id = $1) as user_liked,
                     EXISTS(SELECT 1 FROM reposts WHERE post_id = p.id AND user_id = $1) as user_reposted,
-                    EXISTS(SELECT 1 FROM bookmarks WHERE post_id = p.id AND user_id = $1) as user_bookmarked,
-                    (
-                        SELECT COALESCE(SUM(
-                            COALESCE((p.themes->>key)::float, 0) * 
-                            COALESCE((ui.interest_profile->>key)::float, 0)
-                        ), 0)
-                        FROM UserInterests ui, jsonb_object_keys(COALESCE(p.themes, '{}'::jsonb)) key
-                    ) as theme_score
+                    EXISTS(SELECT 1 FROM bookmarks WHERE post_id = p.id AND user_id = $1) as user_bookmarked
                 FROM posts p
                 JOIN users u ON p.user_id = u.id
                 LEFT JOIN likes l ON p.id = l.post_id
                 LEFT JOIN reposts r ON p.id = r.post_id
                 LEFT JOIN replies rep ON p.id = rep.post_id
                 WHERE p.user_id != $1
-                AND p.id NOT IN (
-                    SELECT post_id FROM user_post_views WHERE user_id = $1
-                )
-                GROUP BY p.id, u.id, u.username, u.display_name, u.avatar_url, p.themes
-                ORDER BY RANDOM(), theme_score DESC, p.created_at DESC
+                GROUP BY p.id, u.id, u.username, u.display_name, u.avatar_url
+                ORDER BY p.created_at DESC
                 LIMIT $2 OFFSET $3
             `;
 
             const result = await pool.query(query, [current_user_id, limitNum, offsetNum]);
             posts = result.rows;
-
-            console.log(`[Feed] Generated theme-based feed for user ${current_user_id} (${posts.length} posts)`);
-            posts = result.rows;
-
-            console.log(`[Feed] Generated theme-based feed for user ${user_id} (${posts.length} posts)`);
         } else {
             // Fallback to chronological feed
             const query = `
@@ -227,38 +207,46 @@ router.get('/posts', async (req, res) => {
     }
 });
 
-// GET /api/feed/recommended - Get recommended posts using external feed algorithm API
+// GET /api/feed/recommended - Get recommended posts from external algorithm API
 router.get('/feed/recommended', async (req, res) => {
     try {
-        const { user_id, offset = 0, limit = 20 } = req.query;
+        const { user_id, cursor = null, limit = 20 } = req.query;
 
         if (!user_id) {
             return res.status(400).json({ error: 'User ID required for recommendations' });
         }
 
         const limitNum = parseInt(limit);
-        const feedApiUrl = process.env.FEED_ALGORITHM_API_URL || 'http://localhost:8000';
+        const feedApiUrl = process.env.FEED_ALGORITHM_API_URL || 'http://localhost:4044';
 
-        // Generate or retrieve session ID (store in memory or use a simple hash)
+        // Generate or use existing session ID (should be stored per user session)
         const sessionId = `session_${user_id}_${Date.now()}`;
 
         try {
-            // Call the external feed algorithm API
+            // Call the external feed algorithm API with cursor
+            console.log(`[Feed] Calling external API: ${feedApiUrl}/api/feed/generate-addictive`);
             const algorithmResponse = await axios.post(`${feedApiUrl}/api/feed/generate-addictive`, {
                 user_id: user_id.toString(),
                 limit: limitNum,
-                cursor: offset > 0 ? offset.toString() : null,
+                cursor: cursor || null,
                 session_id: sessionId
+            }, {
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                timeout: 30000 // 30 second timeout
             });
 
             const feedData = algorithmResponse.data;
 
-            // Extract post IDs from the algorithm response
-            const postIds = feedData.posts.map(p => p.post_id);
+            // Extract post IDs from the algorithm response (already in optimal order)
+            const postIds = feedData.posts.map(p => parseInt(p.post_id));
 
             if (postIds.length === 0) {
                 return res.json([]);
             }
+
+            console.log(`[Feed] Algorithm returned ${postIds.length} posts in order:`, postIds.slice(0, 5));
 
             // Fetch full post data from database
             const query = `
@@ -268,7 +256,6 @@ router.get('/feed/recommended', async (req, res) => {
                     p.media_url,
                     p.media_type,
                     p.created_at,
-                    p.themes,
                     u.id as user_id,
                     u.username,
                     u.display_name,
@@ -289,11 +276,16 @@ router.get('/feed/recommended', async (req, res) => {
             `;
 
             const result = await pool.query(query, [user_id, postIds]);
-            let posts = result.rows;
 
-            // Sort posts according to the algorithm's order
-            const postMap = new Map(posts.map(p => [p.id.toString(), p]));
-            posts = postIds.map(id => postMap.get(id)).filter(p => p !== undefined);
+            // Create a map for quick lookup
+            const postMap = new Map(result.rows.map(p => [p.id, p]));
+
+            // Sort posts according to the algorithm's exact order
+            let posts = postIds
+                .map(id => postMap.get(id))
+                .filter(p => p !== undefined);
+
+            console.log(`[Feed] Returning ${posts.length} posts in algorithm order`);
 
             // Generate pre-signed URLs for media
             posts = await Promise.all(posts.map(async (post) => {
@@ -313,10 +305,12 @@ router.get('/feed/recommended', async (req, res) => {
                 return post;
             }));
 
-            console.log(`[Feed] Generated addictive feed for user ${user_id} (${posts.length} posts) via external API`);
+            console.log(`[Feed] ✅ Generated addictive feed for user ${user_id} (${posts.length} posts)`);
             res.json(posts);
+
         } catch (apiError) {
             console.error('Error calling feed algorithm API:', apiError.message);
+
             // Fallback to simple chronological feed if external API fails
             const fallbackQuery = `
                 SELECT 
@@ -343,10 +337,10 @@ router.get('/feed/recommended', async (req, res) => {
                 WHERE p.user_id != $1
                 GROUP BY p.id, u.id, u.username, u.display_name, u.avatar_url
                 ORDER BY p.created_at DESC
-                LIMIT $2 OFFSET $3
+                LIMIT $2
             `;
 
-            const result = await pool.query(fallbackQuery, [user_id, limitNum, offset]);
+            const result = await pool.query(fallbackQuery, [user_id, limitNum]);
             let posts = result.rows;
 
             // Generate pre-signed URLs for media
@@ -375,6 +369,69 @@ router.get('/feed/recommended', async (req, res) => {
         res.status(500).json({ error: 'Failed to fetch feed' });
     }
 });
+
+// POST /api/sync-posts - Sync posts to external feed algorithm API
+router.post('/sync-posts', async (req, res) => {
+    try {
+        const feedApiUrl = process.env.FEED_ALGORITHM_API_URL || 'http://localhost:4044';
+
+        console.log(`[Sync] Starting post sync to ${feedApiUrl}...`);
+
+        // Get all posts from your database
+        const result = await pool.query(`
+            SELECT 
+                p.id::text as post_id,
+                p.content,
+                p.user_id::text as author_id,
+                ARRAY[]::text[] as themes,
+                COALESCE(p.media_type, 'text') as media_type,
+                p.created_at
+            FROM posts p
+            ORDER BY p.created_at DESC
+            LIMIT 1000
+        `);
+
+        console.log(`[Sync] Found ${result.rows.length} posts to sync`);
+
+        let synced = 0;
+        let failed = 0;
+
+        // Send each post to the external API
+        for (const post of result.rows) {
+            try {
+                await axios.post(`${feedApiUrl}/api/posts`, {
+                    post_id: post.post_id,
+                    content: post.content,
+                    author_id: post.author_id,
+                    themes: post.themes,
+                    media_type: post.media_type,
+                    created_at: post.created_at
+                }, {
+                    timeout: 30000 // 30 second timeout
+                });
+                synced++;
+                if (synced % 100 === 0) {
+                    console.log(`[Sync] Progress: ${synced}/${result.rows.length}`);
+                }
+            } catch (err) {
+                failed++;
+                console.error(`[Sync] Failed to sync post ${post.post_id}:`, err.message);
+            }
+        }
+
+        console.log(`[Sync] Complete: ${synced} synced, ${failed} failed`);
+        res.json({
+            total: result.rows.length,
+            synced: synced,
+            failed: failed
+        });
+    } catch (error) {
+        console.error('[Sync] Error syncing posts:', error);
+        res.status(500).json({ error: 'Failed to sync posts' });
+    }
+});
+
+
 
 // POST /api/posts - Create a new post
 router.post('/posts', async (req, res) => {
@@ -409,28 +466,13 @@ router.post('/posts', async (req, res) => {
 
         const newPost = result.rows[0];
 
+
         // Track post creation
         await trackEvent(user_id || 1, 'post_create', {
             postId: newPost.id,
             hasMedia: !!media_url
         }, req);
 
-        // Trigger LLM analysis for the new post
-        try {
-            const queue = await loadQueueState();
-            queue.push({
-                id: `post_${newPost.id}_${Date.now()}`,
-                type: 'analyze_post',
-                postId: newPost.id,
-                content: content,
-                status: 'pending',
-                addedAt: new Date().toISOString()
-            });
-            await saveQueueState(queue);
-            console.log(`[API] Added post ${newPost.id} to analysis queue`);
-        } catch (error) {
-            console.error('Error adding post to analysis queue:', error);
-        }
 
         res.status(201).json(newPost);
     } catch (error) {
@@ -575,46 +617,6 @@ router.post('/posts/:id/like', async (req, res) => {
             // Track like
             await trackInteraction(user_id || 1, 'like', id, req);
 
-            const { updateInterests } = require('../utils/interest-engine');
-
-            // ... (inside router.post('/posts/:id/like')) ...
-            // Update user interest profile
-            try {
-                // Get post themes
-                const postResult = await pool.query('SELECT themes FROM posts WHERE id = $1', [id]);
-                if (postResult.rows.length > 0 && postResult.rows[0].themes) {
-                    await updateInterests(pool, user_id || 1, postResult.rows[0].themes, 'LIKE');
-                }
-            } catch (err) {
-                console.error('Error updating interest profile:', err);
-            }
-
-            // ... (inside router.post('/posts/:id/repost')) ...
-            // Update user interest profile
-            try {
-                // Get post themes
-                const postResult = await pool.query('SELECT themes FROM posts WHERE id = $1', [id]);
-                if (postResult.rows.length > 0 && postResult.rows[0].themes) {
-                    await updateInterests(pool, user_id || 1, postResult.rows[0].themes, 'REPOST');
-                }
-            } catch (err) {
-                console.error('Error updating interest profile (repost):', err);
-            }
-
-            // ... (inside router.post('/posts/:id/reply')) ...
-            // Update user interest profile
-            try {
-                // Get post themes
-                const postResult = await pool.query('SELECT themes FROM posts WHERE id = $1', [id]);
-                if (postResult.rows.length > 0 && postResult.rows[0].themes) {
-                    await updateInterests(pool, user_id || 1, postResult.rows[0].themes, 'REPLY');
-                }
-            } catch (err) {
-                console.error('Error updating interest profile on reply:', err);
-            }
-
-            // Clear user's recommendation cache since their interests changed
-            clearUserCache(user_id || 1);
 
             // Create notification
             try {
