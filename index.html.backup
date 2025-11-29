@@ -14,37 +14,9 @@
 </head>
 
 <body>
-    <!-- 
-    ╔══════════════════════════════════════════════════════════════════════════════╗
-    ║                          ONX SOCIAL - MAIN STRUCTURE                         ║
-    ╠══════════════════════════════════════════════════════════════════════════════╣
-    ║  NAVIGATION:                                                                 ║
-    ║  • Line ~20:  Left Sidebar (Navigation Menu)                                ║
-    ║  • Line ~143: Context Menu                                                  ║
-    ║  • Line ~173: Main Feed Area                                                ║
-    ║  • Line ~330: Right Sidebar (Widgets)                                       ║
-    ║  • Line ~385: Modals Section                                                ║
-    ║    - Compose Modal (~385)                                                   ║
-    ║    - Reply Modal (~431)                                                     ║
-    ║    - Settings Modal (~483)                                                  ║
-    ║    - Create Channel Modal (~592)                                            ║
-    ║    - Confirmation Modal (~662)                                              ║
-    ║    - Report Modal (~731)                                                    ║
-    ║  • Line ~774: Mobile FAB                                                    ║
-    ║  • Line ~785: Status Modal                                                  ║
-    ║  • Line ~802: AI Explanation Modal                                          ║
-    ║  • Line ~831: Scripts                                                       ║
-    ╚══════════════════════════════════════════════════════════════════════════════╝
-    -->
-
-    <!-- ═══════════════════════════════════════════════════════════════════════ -->
-    <!-- SECTION: MAIN CONTAINER                                                -->
-    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- Main Container -->
     <div class="app-container">
-
-        <!-- ─────────────────────────────────────────────────────────────────── -->
-        <!-- LEFT SIDEBAR: Navigation Menu                                       -->
-        <!-- ─────────────────────────────────────────────────────────────────── -->
+        <!-- Left Sidebar - Navigation -->
         <aside class="sidebar">
             <div class="sidebar-content">
                 <!-- Logo -->
@@ -168,9 +140,7 @@
             </div>
         </aside>
 
-        <!-- ─────────────────────────────────────────────────────────────────── -->
-        <!-- CONTEXT MENU: User Panel Actions                                   -->
-        <!-- ─────────────────────────────────────────────────────────────────── -->
+        <!-- Context Menu for User Panel -->
         <div id="userContextMenu" class="context-menu" style="display: none;">
             <div class="context-menu-item" id="contextSettings">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
@@ -200,9 +170,7 @@
             </div>
         </div>
 
-        <!-- ─────────────────────────────────────────────────────────────────── -->
-        <!-- MAIN FEED: Content Area                                            -->
-        <!-- ─────────────────────────────────────────────────────────────────── -->
+        <!-- Main Feed -->
         <main class="main-feed">
             <!-- Header -->
             <header class="main-header">
@@ -359,9 +327,7 @@
             </div>
         </main>
 
-        <!-- ─────────────────────────────────────────────────────────────────── -->
-        <!-- RIGHT SIDEBAR: Widgets (Search, Trending, Who to Follow)           -->
-        <!-- ─────────────────────────────────────────────────────────────────── -->
+        <!-- Right Sidebar - Widgets -->
         <aside class="widgets">
             <!-- Search -->
             <div class="search-box">
@@ -416,13 +382,7 @@
         </aside>
     </div>
 
-    <!-- ═══════════════════════════════════════════════════════════════════════ -->
-    <!-- SECTION: MODALS                                                         -->
-    <!-- ═══════════════════════════════════════════════════════════════════════ -->
-
-    <!-- ─────────────────────────────────────────────────────────────────── -->
-    <!-- MODAL: Compose Post                                                 -->
-    <!-- ─────────────────────────────────────────────────────────────────── -->
+    <!-- Compose Modal -->
     <div class="modal" id="composeModal">
         <div class="modal-overlay" id="modalOverlay"></div>
         <div class="modal-content">
@@ -468,9 +428,7 @@
         </div>
     </div>
 
-    <!-- ─────────────────────────────────────────────────────────────────── -->
-    <!-- MODAL: Reply to Post                                                -->
-    <!-- ─────────────────────────────────────────────────────────────────── -->
+    <!-- Reply Modal -->
     <div class="modal" id="replyModal">
         <div class="modal-overlay" id="replyModalOverlay"></div>
         <div class="modal-content">
@@ -522,9 +480,7 @@
         </div>
     </div>
 
-    <!-- ─────────────────────────────────────────────────────────────────── -->
-    <!-- MODAL: Settings                                                     -->
-    <!-- ─────────────────────────────────────────────────────────────────── -->
+    <!-- Settings Modal -->
     <div class="modal" id="settingsModal">
         <div class="modal-overlay" id="settingsModalOverlay"></div>
         <div class="modal-content" style="max-width: 700px;">
@@ -633,9 +589,7 @@
         </div>
     </div>
 
-    <!-- ─────────────────────────────────────────────────────────────────── -->
-    <!-- MODAL: Create Channel                                               -->
-    <!-- ─────────────────────────────────────────────────────────────────── -->
+    <!-- Create Channel Modal -->
     <div class="modal" id="createChannelModal">
         <div class="modal-overlay" id="createChannelModalOverlay"></div>
         <div class="modal-content" style="max-width: 450px;">
@@ -705,9 +659,7 @@
         </div>
     </div>
 
-    <!-- ─────────────────────────────────────────────────────────────────── -->
-    <!-- MODAL: Confirmation Dialog                                          -->
-    <!-- ─────────────────────────────────────────────────────────────────── -->
+    <!-- Confirmation Modal -->
     <div class="modal" id="confirmModal">
         <div class="modal-overlay" id="confirmModalOverlay"></div>
         <div class="modal-content" style="max-width: 400px;">
@@ -776,9 +728,7 @@
         </div>
     </div>
 
-    <!-- ─────────────────────────────────────────────────────────────────── -->
-    <!-- MODAL: Report Post                                                  -->
-    <!-- ─────────────────────────────────────────────────────────────────── -->
+    <!-- Report Modal -->
     <div id="reportModal" class="modal">
         <div class="modal-overlay" id="reportModalOverlay"></div>
         <div class="modal-content" style="max-width: 500px;">

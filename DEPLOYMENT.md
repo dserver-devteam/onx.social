@@ -1,8 +1,8 @@
-# N.Social - Deployment Guide
+# ONX Social - Deployment Guide
 
 ## Quick Start (Already Running)
 
-Your N.Social application is currently running at:
+Your ONX Social application is currently running at:
 - **URL:** http://localhost:3000
 - **Database:** Connected to PostgreSQL (testdb_ph3c)
 - **Status:** ✅ Active

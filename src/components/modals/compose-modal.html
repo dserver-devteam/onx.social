@@ -1,0 +1,44 @@
+<!-- Compose Modal -->
+<div class="modal" id="composeModal">
+    <div class="modal-overlay" id="modalOverlay"></div>
+    <div class="modal-content">
+        <div class="modal-header">
+            <button class="modal-close" id="closeModalBtn">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                    <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                </svg>
+            </button>
+        </div>
+        <div class="modal-body">
+            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=CurrentUser" alt="User" class="compose-avatar">
+            <div class="compose-input-wrapper" style="position: relative;">
+                <textarea id="modalComposeInput" class="compose-input modal-compose-input"
+                    placeholder="What's happening?" maxlength="280"></textarea>
+                <div class="autocomplete-dropdown" id="modalAutocomplete"></div>
+                <div id="modalMediaPreview" class="media-preview" style="display: none;">
+                    <img id="modalMediaPreviewImg"
+                        style="max-width: 100%; border-radius: 12px; margin-top: 12px; display: none;">
+                    <video id="modalMediaPreviewVid" controls
+                        style="max-width: 100%; border-radius: 12px; margin-top: 12px; display: none;"></video>
+                    <button class="remove-media-btn" id="modalRemoveMedia">✕</button>
+                </div>
+                <div class="compose-actions">
+                    <div class="media-upload-btn">
+                        <input type="file" id="modalMediaInput" accept="image/*,video/*" style="display: none;">
+                        <label for="modalMediaInput"
+                            style="cursor: pointer; display: flex; align-items: center; gap: 8px; color: var(--color-primary);">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                                <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor"
+                                    stroke-width="2" />
+                                <circle cx="8.5" cy="8.5" r="1.5" fill="currentColor" />
+                                <path d="M21 15L16 10L5 21" stroke="currentColor" stroke-width="2" />
+                            </svg>
+                        </label>
+                    </div>
+                    <div class="char-counter" id="modalCharCounter">0 / 280</div>
+                    <button class="btn-post-small" id="modalPostBtn">Post</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

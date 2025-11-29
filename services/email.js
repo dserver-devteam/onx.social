@@ -33,7 +33,7 @@ if (hasCredentials) {
 // Email templates
 const emailTemplates = {
     welcome: (username) => ({
-        subject: 'Welcome to N.Social! 🎉',
+        subject: 'Welcome to ONX Social! 🎉',
         html: `
             <!DOCTYPE html>
             <html>
@@ -98,12 +98,12 @@ const emailTemplates = {
             <body>
                 <div class="container">
                     <div class="header">
-                        <div class="logo">n.social</div>
+                        <div class="logo">onx.social</div>
                     </div>
                     <div class="content">
-                        <h1>Welcome to N.Social, ${username}! 🎉</h1>
+                        <h1>Welcome to ONX Social, ${username}! 🎉</h1>
                         <p>We're excited to have you join our community!</p>
-                        <p>N.Social is a modern social platform where you can:</p>
+                        <p>ONX Social is a modern social platform where you can:</p>
                         <ul>
                             <li>Share your thoughts and ideas</li>
                             <li>Connect with like-minded people</li>
@@ -111,21 +111,21 @@ const emailTemplates = {
                             <li>Engage with posts through likes and reposts</li>
                         </ul>
                         <p>Start exploring and make your first post today!</p>
-                        <a href="http://localhost:3000" class="button">Go to N.Social</a>
+                        <a href="http://localhost:3000" class="button">Go to ONX Social</a>
                     </div>
                     <div class="footer">
-                        <p>This email was sent from N.Social</p>
-                        <p>© 2025 N.Social. All rights reserved.</p>
+                        <p>This email was sent from ONX Social</p>
+                        <p>© 2025 ONX Social. All rights reserved.</p>
                     </div>
                 </div>
             </body>
             </html>
         `,
-        text: `Welcome to N.Social, ${username}! We're excited to have you join our community. Start exploring and make your first post today!`
+        text: `Welcome to ONX Social, ${username}! We're excited to have you join our community. Start exploring and make your first post today!`
     }),
 
     newFollower: (followerName, username) => ({
-        subject: `${followerName} started following you on N.Social`,
+        subject: `${followerName} started following you on ONX Social`,
         html: `
             <!DOCTYPE html>
             <html>
@@ -174,7 +174,7 @@ const emailTemplates = {
                     <div class="content">
                         <h1>New Follower! 🎉</h1>
                         <p>Hi ${username},</p>
-                        <p><strong>${followerName}</strong> started following you on N.Social!</p>
+                        <p><strong>${followerName}</strong> started following you on ONX Social!</p>
                         <p>Check out their profile and connect with them.</p>
                         <a href="http://localhost:3000" class="button">View Profile</a>
                     </div>
@@ -182,7 +182,7 @@ const emailTemplates = {
             </body>
             </html>
         `,
-        text: `${followerName} started following you on N.Social!`
+        text: `${followerName} started following you on ONX Social!`
     }),
 
     postLiked: (likerName, username, postContent) => ({
@@ -255,7 +255,7 @@ const emailTemplates = {
     }),
 
     account_deleted: (username) => ({
-        subject: 'Your N.Social Account Has Been Deleted',
+        subject: 'Your ONX Social Account Has Been Deleted',
         html: `
             <!DOCTYPE html>
             <html>
@@ -317,32 +317,32 @@ const emailTemplates = {
             <body>
                 <div class="container">
                     <div class="header">
-                        <div class="logo">n.social</div>
+                        <div class="logo">onx.social</div>
                     </div>
                     <div class="content">
                         <h1>Account Deleted</h1>
                         <p>Hi ${username},</p>
-                        <p>Your N.Social account has been permanently deleted by an administrator.</p>
+                        <p>Your ONX Social account has been permanently deleted by an administrator.</p>
                         <div class="warning">
                             <strong>⚠️ This action is permanent</strong><br>
                             All your data including posts, likes, reposts, and replies have been removed from our system.
                         </div>
                         <p>If you believe this was done in error, please contact our support team.</p>
-                        <p>Thank you for being part of N.Social.</p>
+                        <p>Thank you for being part of ONX Social.</p>
                     </div>
                     <div class="footer">
-                        <p>This email was sent from N.Social</p>
-                        <p>© 2025 N.Social. All rights reserved.</p>
+                        <p>This email was sent from ONX Social</p>
+                        <p>© 2025 ONX Social. All rights reserved.</p>
                     </div>
                 </div>
             </body>
             </html>
         `,
-        text: `Hi ${username}, Your N.Social account has been permanently deleted. All your data has been removed from our system. If you believe this was done in error, please contact support.`
+        text: `Hi ${username}, Your ONX Social account has been permanently deleted. All your data has been removed from our system. If you believe this was done in error, please contact support.`
     }),
 
     email_verification: (username, token) => ({
-        subject: 'Verify your N.Social email address',
+        subject: 'Verify your ONX Social email address',
         html: `
             <!DOCTYPE html>
             <html>
@@ -417,12 +417,12 @@ const emailTemplates = {
             <body>
                 <div class="container">
                     <div class="header">
-                        <div class="logo">n.social</div>
+                        <div class="logo">onx.social</div>
                     </div>
                     <div class="content">
                         <h1>Verify Your Email</h1>
                         <p>Hi ${username},</p>
-                        <p>Thanks for signing up for N.Social! Please verify your email address to complete your registration.</p>
+                        <p>Thanks for signing up for ONX Social! Please verify your email address to complete your registration.</p>
                         <a href="http://localhost:3000/verify-email.html?token=${token}" class="button">Verify Email</a>
                         <p style="margin-top: 30px; font-size: 14px;">Or copy and paste this link into your browser:</p>
                         <div class="token-box">http://localhost:3000/verify-email.html?token=${token}</div>
@@ -430,17 +430,17 @@ const emailTemplates = {
                     </div>
                     <div class="footer">
                         <p>If you didn't create an account, you can safely ignore this email.</p>
-                        <p>© 2025 N.Social. All rights reserved.</p>
+                        <p>© 2025 ONX Social. All rights reserved.</p>
                     </div>
                 </div>
             </body>
             </html>
         `,
-        text: `Hi ${username}, Thanks for signing up for N.Social! Please verify your email address by visiting: http://localhost:3000/verify-email.html?token=${token}`
+        text: `Hi ${username}, Thanks for signing up for ONX Social! Please verify your email address by visiting: http://localhost:3000/verify-email.html?token=${token}`
     }),
 
     password_reset: (username, token) => ({
-        subject: 'Reset your N.Social password',
+        subject: 'Reset your ONX Social password',
         html: `
             <!DOCTYPE html>
             <html>
@@ -522,7 +522,7 @@ const emailTemplates = {
             <body>
                 <div class="container">
                     <div class="header">
-                        <div class="logo">n.social</div>
+                        <div class="logo">onx.social</div>
                     </div>
                     <div class="content">
                         <h1>Reset Your Password</h1>
@@ -538,7 +538,7 @@ const emailTemplates = {
                     </div>
                     <div class="footer">
                         <p>If you didn't request this, you can safely ignore this email.</p>
-                        <p>© 2025 N.Social. All rights reserved.</p>
+                        <p>© 2025 ONX Social. All rights reserved.</p>
                     </div>
                 </div>
             </body>
@@ -566,7 +566,7 @@ async function sendEmail(to, template, ...args) {
         }
 
         const mailOptions = {
-            from: `"N.Social" <${process.env.EMAIL_FROM || 'noreply@dserver-team.com'}>`,
+            from: `"ONX Social" <${process.env.EMAIL_FROM || 'noreply@dserver-team.com'}>`,
             to: to,
             subject: emailContent.subject,
             text: emailContent.text,

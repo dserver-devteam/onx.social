@@ -1,4 +1,4 @@
-# N.Social
+# ONX Social
 
 A modern, full-stack social media platform with a stunning dark theme and vibrant blue accents.
 
@@ -125,7 +125,7 @@ deploy-dserver/
 ## 🎯 Key Features
 
 ### Navigation Sidebar
-- N.Social branding with gradient logo
+- ONX Social branding with gradient logo
 - Home, Explore, Notifications, Messages, Bookmarks, Profile
 - Compose post button
 - User profile card

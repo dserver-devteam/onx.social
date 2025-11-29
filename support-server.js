@@ -316,107 +316,66 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'support', 'index.html'));
 });
 
-// Get all conversations
-app.get('/api/support/conversations', supportAuth(pool), async (req, res) => {
+// Get all social posts
+app.get('/api/support/social', supportAuth(pool), async (req, res) => {
     try {
         const result = await pool.query(`
             SELECT 
-                c.*,
-                u1.username as user1_username,
-                u1.display_name as user1_display_name,
-                u2.username as user2_username,
-                u2.display_name as user2_display_name,
-                (SELECT COUNT(*) FROM messages m WHERE m.conversation_id = c.id) as message_count
-            FROM conversations c
-            JOIN users u1 ON c.user1_id = u1.id
-            JOIN users u2 ON c.user2_id = u2.id
-            ORDER BY c.updated_at DESC
-            LIMIT 50
+                sp.*,
+                u.username,
+                u.display_name,
+                u.avatar_url
+            FROM social_posts sp
+            JOIN users u ON sp.user_id = u.id
+            ORDER BY sp.created_at DESC
+            LIMIT 100
         `);
         res.json(result.rows);
     } catch (error) {
-        console.error('Error fetching conversations:', error);
-        res.status(500).json({ error: 'Failed to fetch conversations' });
+        console.error('Error fetching social posts:', error);
+        res.status(500).json({ error: 'Failed to fetch social posts' });
     }
 });
 
-// Unlock conversation
-app.post('/api/support/conversations/:id/unlock', supportAuth(pool), async (req, res) => {
+// Get single social post details
+app.get('/api/support/social/:id', supportAuth(pool), async (req, res) => {
     try {
         const { id } = req.params;
 
-        // Get conversation details
-        const convResult = await pool.query(`
-            SELECT c.*, u1.email as user1_email, u2.email as user2_email, u1.id as user1_id, u2.id as user2_id
-            FROM conversations c
-            JOIN users u1 ON c.user1_id = u1.id
-            JOIN users u2 ON c.user2_id = u2.id
-            WHERE c.id = $1
-        `, [id]);
-
-        if (convResult.rows.length === 0) {
-            return res.status(404).json({ error: 'Conversation not found' });
-        }
-
-        const conversation = convResult.rows[0];
-
-        // Send emails
-        const mailOptions = {
-            from: '"N.Social Support" <support@n.social>',
-            subject: 'Conversation Unlocked',
-            text: `Your conversation #${id} has been unlocked by support.`
-        };
-
-        // Send to both users (in parallel) - ignoring errors for demo
-        try {
-            await Promise.all([
-                transporter.sendMail({ ...mailOptions, to: conversation.user1_email }),
-                transporter.sendMail({ ...mailOptions, to: conversation.user2_email })
-            ]);
-        } catch (emailError) {
-            console.error('Error sending unlock emails:', emailError);
-        }
-
-        // Create notifications
-        const notifQuery = `
-            INSERT INTO notifications (user_id, type, actor_id, conversation_id, message)
-            VALUES ($1, 'message_unlock', $2, $3, 'Your conversation was unlocked by support')
-        `;
-        await pool.query(notifQuery, [conversation.user1_id, req.user.id, id]);
-        await pool.query(notifQuery, [conversation.user2_id, req.user.id, id]);
-
-        res.json({ success: true, key: conversation.encryption_key });
-    } catch (error) {
-        console.error('Error unlocking conversation:', error);
-        res.status(500).json({ error: 'Failed to unlock conversation' });
-    }
-});
-
-// Download conversation logs
-app.get('/api/support/conversations/:id/download', supportAuth(pool), async (req, res) => {
-    try {
-        const { id } = req.params;
-
-        // Get messages
         const result = await pool.query(`
-            SELECT m.*, u.username
-            FROM messages m
-            JOIN users u ON m.sender_id = u.id
-            WHERE m.conversation_id = $1
-            ORDER BY m.created_at ASC
+            SELECT 
+                sp.*,
+                u.username,
+                u.display_name,
+                u.avatar_url,
+                u.id as user_id
+            FROM social_posts sp
+            JOIN users u ON sp.user_id = u.id
+            WHERE sp.id = $1
         `, [id]);
 
-        const messages = result.rows;
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Social post not found' });
+        }
 
-        // Format as text
-        const log = messages.map(m => `[${m.created_at}] ${m.username}: ${m.encrypted_content} (Encrypted)`).join('\n');
-
-        res.setHeader('Content-Disposition', `attachment; filename=conversation-${id}.txt`);
-        res.setHeader('Content-Type', 'text/plain');
-        res.send(log);
+        res.json(result.rows[0]);
     } catch (error) {
-        console.error('Error downloading conversation:', error);
-        res.status(500).json({ error: 'Failed to download conversation' });
+        console.error('Error fetching social post:', error);
+        res.status(500).json({ error: 'Failed to fetch social post' });
+    }
+});
+
+// Delete social post (moderation action)
+app.delete('/api/support/social/:id', supportAuth(pool), async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        await pool.query('DELETE FROM social_posts WHERE id = $1', [id]);
+
+        res.json({ success: true, message: 'Social post deleted successfully' });
+    } catch (error) {
+        console.error('Error deleting social post:', error);
+        res.status(500).json({ error: 'Failed to delete social post' });
     }
 });
 

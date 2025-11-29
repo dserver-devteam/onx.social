@@ -1,4 +1,4 @@
-# N.Social Admin & Support Panels
+# ONX Social Admin & Support Panels
 
 ## Quick Start
 

@@ -102,6 +102,13 @@ app.use('/api', apiRouter);
 app.use('/auth', authRouter);
 app.use('/upload', require('./routes/upload'));
 
+// Channels routes with pool middleware
+const channelsRouter = require('./routes/channels');
+app.use('/api', (req, res, next) => {
+    req.pool = pool;
+    next();
+}, channelsRouter);
+
 // Serve index.html for root route
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
@@ -151,7 +158,7 @@ app.use((err, req, res, next) => {
 
 // Start server
 app.listen(PORT, () => {
-    console.log(`🚀 N.Social server running on http://localhost:${PORT}`);
+    console.log(`🚀 ONX Social server running on http://localhost:${PORT}`);
     console.log(`📊 Database: ${process.env.DB_NAME}`);
 });
 

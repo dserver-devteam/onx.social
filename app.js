@@ -656,7 +656,54 @@ async function requireAuth() {
 let postsOffset = 0;
 let isLoadingPosts = false;
 let hasMorePosts = true;
+let nextCursor = null; // Cursor for algorithm feed
+let currentSessionId = null; // Session ID for algorithm feed
 const POSTS_PER_PAGE = 20;
+
+// Session persistence helpers
+function saveSessionState() {
+    if (currentUser && nextCursor) {
+        localStorage.setItem('feedSession', JSON.stringify({
+            cursor: nextCursor,
+            sessionId: currentSessionId,
+            userId: currentUser.id,
+            timestamp: Date.now()
+        }));
+    }
+}
+
+function loadSessionState() {
+    try {
+        const sessionStr = localStorage.getItem('feedSession');
+        if (!sessionStr) return null;
+
+        const session = JSON.parse(sessionStr);
+
+        // Check if session is still valid (less than 1 hour old)
+        const oneHourAgo = Date.now() - (60 * 60 * 1000);
+        if (session.timestamp < oneHourAgo) {
+            localStorage.removeItem('feedSession');
+            return null;
+        }
+
+        // Check if session belongs to current user
+        if (currentUser && session.userId === currentUser.id) {
+            return session;
+        }
+
+        return null;
+    } catch (e) {
+        console.error('Error loading session state:', e);
+        return null;
+    }
+}
+
+function clearSessionState() {
+    localStorage.removeItem('feedSession');
+    nextCursor = null;
+    currentSessionId = null;
+}
+
 
 // Load posts from API
 async function loadPosts(append = false) {
@@ -680,23 +727,82 @@ async function loadPosts(append = false) {
     }
 
     try {
-        let url = `${API_BASE}/posts?limit=${POSTS_PER_PAGE}&offset=${postsOffset}`;
+        let newPosts = [];
+        let fetchedCursor = null;
 
-        // Add current_user_id to enable smart recommendations (view exclusion)
+        // Always try algorithm-powered feed for logged-in users first
         if (currentUser) {
-            url += `&current_user_id=${currentUser.id}`;
-            // Use the algorithm-powered feed for logged-in users
-            url = `${API_BASE}/feed/recommended?user_id=${currentUser.id}&limit=${POSTS_PER_PAGE}&offset=${postsOffset}`;
+            try {
+                // Build URL with cursor if available
+                // Add cache-busting timestamp to prevent browser caching
+                let algoUrl = `${API_BASE}/feed/recommended?user_id=${currentUser.id}&limit=${POSTS_PER_PAGE}&_t=${Date.now()}`;
+                if (nextCursor) {
+                    algoUrl += `&cursor=${encodeURIComponent(nextCursor)}`;
+                }
+
+                console.log('[Feed] Fetching algorithm feed:', algoUrl);
+
+                const algoResponse = await fetch(algoUrl, {
+                    cache: 'no-store'  // Disable browser caching
+                });
+                if (algoResponse.ok) {
+                    const algoData = await algoResponse.json();
+
+                    // Handle response format (array or object with posts/cursor)
+                    if (Array.isArray(algoData)) {
+                        // Legacy format (should not happen with new backend)
+                        newPosts = algoData;
+                    } else {
+                        // New cursor-based format
+                        newPosts = algoData.posts || [];
+                        fetchedCursor = algoData.next_cursor;
+
+                        // Store session_id if provided
+                        if (algoData.session_id) {
+                            currentSessionId = algoData.session_id;
+                        }
+
+                        // Update next cursor for infinite scroll
+                        if (fetchedCursor) {
+                            nextCursor = fetchedCursor;
+                            saveSessionState(); // Persist session
+                            console.log('[Feed] Next cursor:', nextCursor);
+                        } else {
+                            console.log('[Feed] No next cursor returned');
+                            hasMorePosts = false;
+                        }
+                    }
+
+                    console.log('[Feed] Algorithm returned:', newPosts.length, 'posts');
+                }
+            } catch (algoError) {
+                console.warn('[Feed] Algorithm feed failed:', algoError.message);
+            }
         }
 
-        const response = await fetch(url);
-        if (!response.ok) throw new Error('Failed to fetch posts');
+        // Fallback to chronological feed ONLY if algorithm failed completely (not just empty)
+        // Twitter doesn't fallback to chronological mixed in, it just shows "You're all caught up"
+        if (newPosts.length === 0 && !currentUser) {
+            let url = `${API_BASE}/posts?limit=${POSTS_PER_PAGE}&offset=${postsOffset}`;
 
-        const newPosts = await response.json();
+            // Add current_user_id for interaction state
+            if (currentUser) {
+                url += `&current_user_id=${currentUser.id}`;
+            }
 
-        // Check if we got fewer posts than requested (means no more posts)
-        if (newPosts.length < POSTS_PER_PAGE) {
-            hasMorePosts = false;
+            console.log('[Feed] Loading chronological feed:', url);
+            const response = await fetch(url);
+            if (!response.ok) throw new Error('Failed to fetch posts');
+            newPosts = await response.json();
+            console.log('[Feed] ✅ Loaded', newPosts.length, 'chronological posts');
+
+            // Check if we got fewer posts than requested (means no more posts)
+            if (newPosts.length < POSTS_PER_PAGE) {
+                hasMorePosts = false;
+            }
+
+            // Update offset for chronological feed
+            postsOffset += newPosts.length;
         }
 
         if (append) {
@@ -711,12 +817,15 @@ async function loadPosts(append = false) {
                 const newPostsHTML = newPosts.map(post => createPostHTML(post)).join('');
                 feedContainer.insertAdjacentHTML('beforeend', newPostsHTML);
                 attachPostEventListeners();
+
+                // Track newly appended posts
+                if (window.dwellTracker) {
+                    setTimeout(() => window.dwellTracker.trackAllPosts(), 100);
+                }
             }
         } else {
             // Replace posts (initial load or refresh)
             posts = newPosts;
-
-            // Counters removed
 
             if (posts.length === 0) {
                 feedContainer.innerHTML = `
@@ -731,11 +840,11 @@ async function loadPosts(append = false) {
             feedContainer.innerHTML = posts.map(post => createPostHTML(post)).join('');
             attachPostEventListeners();
 
-            // View tracking removed
+            // Initialize dwell tracking for new posts
+            if (window.dwellTracker) {
+                setTimeout(() => window.dwellTracker.trackAllPosts(), 100);
+            }
         }
-
-        // Update offset for next load
-        postsOffset += newPosts.length;
 
 
     } catch (error) {
@@ -761,6 +870,10 @@ async function loadPosts(append = false) {
 function resetPagination() {
     postsOffset = 0;
     hasMorePosts = true;
+    nextCursor = null; // Reset cursor
+
+    // Clear session to force new feed generation with fresh randomization
+    clearSessionState();
     posts = [];
 }
 
@@ -936,7 +1049,6 @@ async function toggleLike(postId, button) {
         });
 
         if (!response.ok) throw new Error('Failed to toggle like');
-
         const data = await response.json();
 
         // Update UI
@@ -946,6 +1058,11 @@ async function toggleLike(postId, button) {
         if (data.liked) {
             button.classList.add('liked');
             countSpan.textContent = currentCount + 1;
+
+            // Track like interaction in algorithm service
+            if (window.dwellTracker) {
+                window.dwellTracker.trackInteraction(postId, 'like');
+            }
         } else {
             button.classList.remove('liked');
             countSpan.textContent = Math.max(0, currentCount - 1);
@@ -981,6 +1098,11 @@ async function toggleRepost(postId, button) {
         if (data.reposted) {
             button.classList.add('reposted');
             countSpan.textContent = currentCount + 1;
+
+            // Track retweet interaction in algorithm service
+            if (window.dwellTracker) {
+                window.dwellTracker.trackInteraction(postId, 'retweet');
+            }
         } else {
             button.classList.remove('reposted');
             countSpan.textContent = Math.max(0, currentCount - 1);
@@ -3365,7 +3487,6 @@ function createMessageHTML(message) {
     const isSent = message.sender_id === currentUser.id;
     const decryptedContent = MessageEncryption.decrypt(message.encrypted_content, currentEncryptionKey);
     const timeAgo = formatTimeAgo(new Date(message.created_at));
-
     return `
         <div class="message-bubble ${isSent ? 'sent' : 'received'}">
             <div class="message-content">${escapeHtml(decryptedContent)}</div>

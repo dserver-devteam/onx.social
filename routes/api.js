@@ -42,6 +42,56 @@ const transporter = nodemailer.createTransport({
     socketTimeout: 10000
 });
 
+const ALGORITHM_API_URL = process.env.FEED_ALGORITHM_API_URL || 'http://localhost:4044';
+
+// Session storage for feed pagination (user_id -> session_id)
+// In production, use Redis or similar distributed cache
+const userFeedSessions = new Map();
+
+// Clean up old sessions periodically (older than 1 hour)
+setInterval(() => {
+    const oneHourAgo = Date.now() - (60 * 60 * 1000);
+    for (const [userId, sessionData] of userFeedSessions.entries()) {
+        if (sessionData.timestamp < oneHourAgo) {
+            userFeedSessions.delete(userId);
+        }
+    }
+}, 5 * 60 * 1000); // Run every 5 minutes
+
+// Helper to sync post to algorithm service
+async function syncPostToAlgorithm(post) {
+    try {
+        await axios.post(`${ALGORITHM_API_URL}/api/posts/sync`, {
+            post_id: post.id.toString(),
+            author_id: post.user_id.toString(),
+            content: post.content,
+            media_type: post.media_type || 'text',
+            created_at: new Date().toISOString(), // Use current time if not in post object
+            likes_count: 0,
+            retweets_count: 0,
+            replies_count: 0,
+            views_count: 0
+        });
+        console.log(`[Algorithm] Synced post ${post.id}`);
+    } catch (error) {
+        console.error('[Algorithm] Failed to sync post:', error.message);
+    }
+}
+
+// Helper to track interaction in algorithm service
+async function trackInteractionInAlgorithm(userId, postId, action, dwellTime = 0) {
+    try {
+        await axios.post(`${ALGORITHM_API_URL}/api/interactions/track`, {
+            user_id: userId.toString(),
+            post_id: postId.toString(),
+            action: action,
+            dwell_time_seconds: dwellTime
+        });
+    } catch (error) {
+        console.error('[Algorithm] Failed to track interaction:', error.message);
+    }
+}
+
 // GET /api/posts - Get posts for feed (LLM-personalized or chronological fallback)
 router.get('/posts', async (req, res) => {
     try {
@@ -219,13 +269,33 @@ router.get('/feed/recommended', async (req, res) => {
         const limitNum = parseInt(limit);
         const feedApiUrl = process.env.FEED_ALGORITHM_API_URL || 'http://localhost:4044';
 
-        // Generate or use existing session ID (should be stored per user session)
-        const sessionId = `session_${user_id}_${Date.now()}`;
+        // Session management: reuse existing session or create new one
+        let sessionId;
+        if (cursor) {
+            // If cursor provided, try to extract session from it or use stored session
+            const sessionData = userFeedSessions.get(user_id);
+            if (sessionData) {
+                sessionId = sessionData.sessionId;
+                console.log(`[Feed] Reusing session ${sessionId} for user ${user_id}`);
+            } else {
+                // Cursor provided but no stored session - create new one
+                sessionId = `session_${user_id}_${Date.now()}`;
+                console.log(`[Feed] Cursor provided but no session found, creating new: ${sessionId}`);
+            }
+        } else {
+            // No cursor = fresh feed request, create new session
+            sessionId = `session_${user_id}_${Date.now()}`;
+            userFeedSessions.set(user_id, {
+                sessionId: sessionId,
+                timestamp: Date.now()
+            });
+            console.log(`[Feed] Created new session ${sessionId} for user ${user_id}`);
+        }
 
         try {
             // Call the external feed algorithm API with cursor
-            console.log(`[Feed] Calling external API: ${feedApiUrl}/api/feed/generate-addictive`);
-            const algorithmResponse = await axios.post(`${feedApiUrl}/api/feed/generate-addictive`, {
+            console.log(`[Feed] Calling external API: ${feedApiUrl}/api/feed/generate`);
+            const algorithmResponse = await axios.post(`${feedApiUrl}/api/feed/generate`, {
                 user_id: user_id.toString(),
                 limit: limitNum,
                 cursor: cursor || null,
@@ -234,16 +304,23 @@ router.get('/feed/recommended', async (req, res) => {
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                timeout: 30000 // 30 second timeout
+                timeout: 5000 // 5 second timeout for better UX
             });
 
             const feedData = algorithmResponse.data;
+            let postIds = [];
+            let nextCursor = null;
 
-            // Extract post IDs from the algorithm response (already in optimal order)
-            const postIds = feedData.posts.map(p => parseInt(p.post_id));
+            // Handle both legacy array format and new object format
+            if (Array.isArray(feedData)) {
+                postIds = feedData.map(p => parseInt(p.post_id));
+            } else {
+                postIds = (feedData.posts || []).map(p => parseInt(p.post_id));
+                nextCursor = feedData.next_cursor;
+            }
 
             if (postIds.length === 0) {
-                return res.json([]);
+                return res.json({ posts: [], next_cursor: null });
             }
 
             console.log(`[Feed] Algorithm returned ${postIds.length} posts in order:`, postIds.slice(0, 5));
@@ -306,7 +383,22 @@ router.get('/feed/recommended', async (req, res) => {
             }));
 
             console.log(`[Feed] ✅ Generated addictive feed for user ${user_id} (${posts.length} posts)`);
-            res.json(posts);
+
+            // Track post views in algorithm service
+            const postIdsToTrack = posts.map(p => p.id.toString());
+            for (const postId of postIdsToTrack) {
+                // Fire and forget - don't wait for response
+                trackInteractionInAlgorithm(user_id, postId, 'view', 0).catch(err => {
+                    console.error(`[Feed] Failed to track view for post ${postId}:`, err.message);
+                });
+            }
+
+            // Return object with posts, cursor, and session_id
+            res.json({
+                posts: posts,
+                next_cursor: nextCursor,
+                session_id: sessionId  // Return session_id for frontend to store
+            });
 
         } catch (apiError) {
             console.error('Error calling feed algorithm API:', apiError.message);
@@ -385,7 +477,10 @@ router.post('/sync-posts', async (req, res) => {
                 p.user_id::text as author_id,
                 ARRAY[]::text[] as themes,
                 COALESCE(p.media_type, 'text') as media_type,
-                p.created_at
+                p.created_at,
+                (SELECT COUNT(*) FROM likes WHERE post_id = p.id) as likes_count,
+                (SELECT COUNT(*) FROM reposts WHERE post_id = p.id) as retweets_count,
+                (SELECT COUNT(*) FROM replies WHERE post_id = p.id) as replies_count
             FROM posts p
             ORDER BY p.created_at DESC
             LIMIT 1000
@@ -399,13 +494,16 @@ router.post('/sync-posts', async (req, res) => {
         // Send each post to the external API
         for (const post of result.rows) {
             try {
-                await axios.post(`${feedApiUrl}/api/posts`, {
+                await axios.post(`${feedApiUrl}/api/posts/sync`, {
                     post_id: post.post_id,
-                    content: post.content,
                     author_id: post.author_id,
-                    themes: post.themes,
+                    content: post.content,
                     media_type: post.media_type,
-                    created_at: post.created_at
+                    created_at: post.created_at,
+                    likes_count: parseInt(post.likes_count || 0),
+                    retweets_count: parseInt(post.retweets_count || 0),
+                    replies_count: parseInt(post.replies_count || 0),
+                    views_count: 0
                 }, {
                     timeout: 30000 // 30 second timeout
                 });
@@ -428,6 +526,84 @@ router.post('/sync-posts', async (req, res) => {
     } catch (error) {
         console.error('[Sync] Error syncing posts:', error);
         res.status(500).json({ error: 'Failed to sync posts' });
+    }
+});
+
+// POST /api/sync-users - Sync users to algorithm
+router.post('/sync-users', async (req, res) => {
+    try {
+        const feedApiUrl = process.env.FEED_ALGORITHM_API_URL || 'http://localhost:4044';
+        console.log(`[Sync] Starting user sync...`);
+
+        const result = await pool.query(`
+            SELECT 
+                u.id::text as user_id,
+                u.username,
+                u.display_name,
+                (SELECT COUNT(*) FROM follows WHERE following_id = u.id) as followers_count,
+                (SELECT COUNT(*) FROM follows WHERE follower_id = u.id) as following_count,
+                (SELECT COUNT(*) FROM posts WHERE user_id = u.id) as posts_count,
+                u.created_at
+            FROM users u
+            LIMIT 1000
+        `);
+
+        let synced = 0;
+        for (const user of result.rows) {
+            try {
+                await axios.post(`${feedApiUrl}/api/users/sync`, {
+                    user_id: user.user_id,
+                    username: user.username,
+                    display_name: user.display_name,
+                    followers_count: parseInt(user.followers_count),
+                    following_count: parseInt(user.following_count),
+                    posts_count: parseInt(user.posts_count),
+                    created_at: user.created_at
+                });
+                synced++;
+            } catch (e) {
+                console.error(`Failed to sync user ${user.user_id}: ${e.message}`);
+            }
+        }
+        res.json({ total: result.rows.length, synced });
+    } catch (error) {
+        console.error('Error syncing users:', error);
+        res.status(500).json({ error: 'Failed to sync users' });
+    }
+});
+
+// POST /api/sync-follows - Sync follows to algorithm
+router.post('/sync-follows', async (req, res) => {
+    try {
+        const feedApiUrl = process.env.FEED_ALGORITHM_API_URL || 'http://localhost:4044';
+        console.log(`[Sync] Starting follows sync...`);
+
+        const result = await pool.query(`
+            SELECT 
+                follower_id::text,
+                following_id::text,
+                created_at
+            FROM follows
+            LIMIT 5000
+        `);
+
+        let synced = 0;
+        for (const follow of result.rows) {
+            try {
+                await axios.post(`${feedApiUrl}/api/follows/sync`, {
+                    follower_id: follow.follower_id,
+                    following_id: follow.following_id,
+                    created_at: follow.created_at
+                });
+                synced++;
+            } catch (e) {
+                console.error(`Failed to sync follow: ${e.message}`);
+            }
+        }
+        res.json({ total: result.rows.length, synced });
+    } catch (error) {
+        console.error('Error syncing follows:', error);
+        res.status(500).json({ error: 'Failed to sync follows' });
     }
 });
 
@@ -472,6 +648,9 @@ router.post('/posts', async (req, res) => {
             postId: newPost.id,
             hasMedia: !!media_url
         }, req);
+
+        // Sync to algorithm service
+        syncPostToAlgorithm(newPost);
 
 
         res.status(201).json(newPost);
@@ -616,6 +795,7 @@ router.post('/posts/:id/like', async (req, res) => {
 
             // Track like
             await trackInteraction(user_id || 1, 'like', id, req);
+            trackInteractionInAlgorithm(user_id || 1, id, 'like');
 
 
             // Create notification
@@ -667,6 +847,7 @@ router.post('/posts/:id/repost', async (req, res) => {
 
             // Track repost
             await trackInteraction(user_id || 1, 'repost', id, req);
+            trackInteractionInAlgorithm(user_id || 1, id, 'retweet');
 
             // Clear user's recommendation cache since their interests changed
             clearUserCache(user_id || 1);
@@ -751,6 +932,9 @@ router.post('/posts/:id/reply', async (req, res) => {
         }
 
         res.status(201).json(result.rows[0]);
+
+        // Track reply in algorithm
+        trackInteractionInAlgorithm(user_id || 1, id, 'reply');
     } catch (error) {
         console.error('Error creating reply:', error);
         res.status(500).json({ error: 'Failed to create reply' });
@@ -1001,13 +1185,13 @@ router.post('/users/:id/export-data', async (req, res) => {
         if (user.email) {
             try {
                 await transporter.sendMail({
-                    from: '"N.Social" <noreply@dserver-team.com>',
+                    from: '"ONX Social" <noreply@dserver-team.com>',
                     to: user.email,
-                    subject: 'Your N.Social Data Export',
+                    subject: 'Your ONX Social Data Export',
                     text: `Here is your requested data export. This link is valid for 7 days: \n\n${downloadUrl} `,
                     html: `
                         <h3>Your Data Export is Ready</h3>
-                        <p>You requested a copy of your data from N.Social.</p>
+                        <p>You requested a copy of your data from ONX Social.</p>
                         <p><a href="${downloadUrl}">Click here to download your data</a></p>
                         <p>This link is valid for 7 days.</p>
                     `
@@ -2733,6 +2917,26 @@ router.post('/preferences/update', async (req, res) => {
     } catch (error) {
         console.error('Error updating preferences:', error);
         res.status(500).json({ error: 'Failed to update preferences' });
+    }
+});
+
+// POST /api/interactions/track - Track user interactions (dwell, skip, etc.)
+router.post('/interactions/track', async (req, res) => {
+    try {
+        const { post_id, action, dwell_time_seconds } = req.body;
+        const user_id = req.user?.id || req.body.user_id || 1;
+
+        if (!post_id || !action) {
+            return res.status(400).json({ error: 'Post ID and action are required' });
+        }
+
+        // Track in algorithm service
+        await trackInteractionInAlgorithm(user_id, post_id, action, dwell_time_seconds);
+
+        res.json({ status: 'success' });
+    } catch (error) {
+        console.error('Error tracking interaction:', error);
+        res.status(500).json({ error: 'Failed to track interaction' });
     }
 });
 

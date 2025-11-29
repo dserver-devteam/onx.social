@@ -165,8 +165,17 @@ async function loadView(view) {
         case 'all':
             await renderReports(container);
             break;
-        case 'conversations':
-            await renderConversations(container);
+        case 'social':
+            await renderSocialPosts(container);
+            break;
+        case 'users':
+            await renderUsers(container);
+            break;
+        case 'analytics':
+            await renderAnalytics(container);
+            break;
+        case 'audit':
+            await renderAuditLog(container);
             break;
     }
 }
@@ -453,44 +462,46 @@ async function addNotes(reportId) {
     }
 }
 
-// ===== CONVERSATIONS VIEW =====
-async function renderConversations(container) {
-    container.innerHTML = '<div class="loading">Loading conversations...</div>';
+// ===== SOCIAL POSTS VIEW =====
+async function renderSocialPosts(container) {
+    container.innerHTML = '<div class="loading">Loading social posts...</div>';
 
     try {
-        const conversations = await apiCall('/conversations');
+        const posts = await apiCall('/social');
 
         container.innerHTML = `
-            <h1 style="font-size: 2rem; margin-bottom: 2rem;">Conversations</h1>
+            <h1 style="font-size: 2rem; margin-bottom: 2rem;">Social Posts</h1>
             
             <div class="content-section">
                 <div class="section-header">
-                    <h2 class="section-title">${conversations.length} Conversation${conversations.length !== 1 ? 's' : ''}</h2>
+                    <h2 class="section-title">${posts.length} Social Post${posts.length !== 1 ? 's' : ''}</h2>
                 </div>
-                ${conversations.length === 0 ?
-                '<div class="loading">No conversations found</div>' :
+                ${posts.length === 0 ?
+                '<div class="loading">No social posts found</div>' :
                 `<table class="data-table">
                         <thead>
                             <tr>
                                 <th>ID</th>
-                                <th>Participants</th>
-                                <th>Messages</th>
-                                <th>Last Updated</th>
+                                <th>Content</th>
+                                <th>Author</th>
+                                <th>Created</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
-                            ${conversations.map(conv => `
+                            ${posts.map(post => `
                                 <tr>
-                                    <td>${conv.id}</td>
+                                    <td>${post.id}</td>
+                                    <td style="max-width: 300px;">${escapeHTML(post.content)}</td>
                                     <td>
-                                        <div>@${conv.user1_username}</div>
-                                        <div>@${conv.user2_username}</div>
+                                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                            <img src="${post.avatar_url}" alt="${post.display_name}" style="width: 24px; height: 24px; border-radius: 50%;">
+                                            <span>@${post.username}</span>
+                                        </div>
                                     </td>
-                                    <td>${conv.message_count}</td>
-                                    <td>${new Date(conv.updated_at).toLocaleString()}</td>
+                                    <td>${new Date(post.created_at).toLocaleString()}</td>
                                     <td>
-                                        <button class="btn btn-sm btn-primary" onclick="viewConversation(${conv.id})">View Details</button>
+                                        <button class="btn btn-sm btn-primary" onclick="viewSocialPost(${post.id})">View</button>
                                     </td>
                                 </tr>
                             `).join('')}
@@ -500,85 +511,86 @@ async function renderConversations(container) {
             </div>
         `;
     } catch (error) {
-        console.error('Error loading conversations:', error);
-        container.innerHTML = '<div class="loading" style="color: var(--color-danger);">Failed to load conversations</div>';
+        console.error('Error loading social posts:', error);
+        container.innerHTML = '<div class="loading" style="color: var(--color-danger);">Failed to load social posts</div>';
     }
 }
 
-// ===== CONVERSATION DETAIL MODAL =====
-async function viewConversation(id) {
-    const modal = document.getElementById('conversationModal');
-    const detailsContainer = document.getElementById('conversationDetails');
+// ===== SOCIAL POST DETAIL =====
+async function viewSocialPost(id) {
+    try {
+        const post = await apiCall(`/social/${id}`);
 
-    detailsContainer.innerHTML = `
-        <div style="display: grid; gap: 1.5rem;">
-            <div style="background: var(--color-bg-tertiary); padding: 1rem; border-radius: var(--radius-md);">
-                <p>Conversation ID: <strong>${id}</strong></p>
-                <p style="margin-top: 0.5rem; color: var(--color-text-secondary);">
-                    This conversation is end-to-end encrypted. Support staff cannot view messages without unlocking the conversation using the master key.
-                </p>
-            </div>
-            
-            <div>
-                <h3 style="font-size: 1.125rem; margin-bottom: 0.5rem; color: var(--color-text-secondary);">Actions</h3>
-                <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
-                    <button class="btn btn-warning" onclick="unlockConversation(${id})">
-                        Unlock Conversation
-                    </button>
-                    <button class="btn btn-primary" onclick="downloadConversation(${id})">
-                        Download Logs
-                    </button>
+        const modal = document.getElementById('reportModal');
+        const detailsContainer = document.getElementById('reportDetails');
+
+        detailsContainer.innerHTML = `
+            <div style="display: grid; gap: 1.5rem;">
+                <div>
+                    <h3 style="font-size: 1.125rem; margin-bottom: 0.5rem; color: var(--color-text-secondary);">Social Post Information</h3>
+                    <div style="background: var(--color-bg-tertiary); padding: 1rem; border-radius: var(--radius-md);">
+                        <div style="display: grid; grid-template-columns: 150px 1fr; gap: 0.5rem; margin-bottom: 0.5rem;">
+                            <strong>Post ID:</strong> <span>#${post.id}</span>
+                            <strong>Created:</strong> <span>${new Date(post.created_at).toLocaleString()}</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div>
+                    <h3 style="font-size: 1.125rem; margin-bottom: 0.5rem; color: var(--color-text-secondary);">Content</h3>
+                    <div style="background: var(--color-bg-tertiary); padding: 1rem; border-radius: var(--radius-md);">
+                        <div style="padding: 1rem; background: var(--color-bg-primary); border-radius: var(--radius-sm);">
+                            ${escapeHTML(post.content)}
+                        </div>
+                    </div>
+                </div>
+                
+                <div>
+                    <h3 style="font-size: 1.125rem; margin-bottom: 0.5rem; color: var(--color-text-secondary);">Author</h3>
+                    <div style="background: var(--color-bg-tertiary); padding: 1rem; border-radius: var(--radius-md);">
+                        <div style="display: flex; align-items: center; gap: 1rem;">
+                            <img src="${post.avatar_url}" alt="${post.display_name}" style="width: 48px; height: 48px; border-radius: 50%; border: 2px solid var(--color-border);">
+                            <div>
+                                <div><strong>${post.display_name}</strong></div>
+                                <div style="color: var(--color-text-secondary);">@${post.username}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div>
+                    <h3 style="font-size: 1.125rem; margin-bottom: 0.5rem; color: var(--color-text-secondary);">Moderation Actions</h3>
+                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                        <button class="btn btn-danger" onclick="deleteSocialPost(${post.id})">Delete Post</button>
+                        <button class="btn btn-warning" onclick="tempBanUser(${post.user_id}, '${post.username}', null)">Temp Ban User</button>
+                    </div>
                 </div>
             </div>
-        </div>
-    `;
+        `;
 
-    modal.classList.add('show');
+        modal.classList.add('show');
+    } catch (error) {
+        console.error('Error loading social post details:', error);
+        alert('Failed to load social post details');
+    }
 }
 
-function closeConversationModal() {
-    const modal = document.getElementById('conversationModal');
-    modal.classList.remove('show');
-}
-
-async function unlockConversation(id) {
-    if (!confirm('Are you sure you want to unlock this conversation? This action will be logged and users will be notified via email.')) {
+async function deleteSocialPost(postId) {
+    if (!confirm('Are you sure you want to DELETE this social post? This action cannot be undone.')) {
         return;
     }
 
     try {
-        const response = await apiCall(`/conversations/${id}/unlock`, { method: 'POST' });
-        if (response.success) {
-            alert(`Conversation unlocked!\nEncryption Key: ${response.key}`);
-        }
-    } catch (error) {
-        console.error('Error unlocking conversation:', error);
-        alert('Failed to unlock conversation');
-    }
-}
-
-async function downloadConversation(id) {
-    try {
-        const response = await fetch(`${API_BASE}/conversations/${id}/download`, {
-            headers: {
-                'Authorization': `Bearer ${authToken}`
-            }
+        await apiCall(`/social/${postId}`, {
+            method: 'DELETE'
         });
 
-        if (!response.ok) throw new Error('Download failed');
-
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `conversation-${id}.txt`;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
+        alert('Social post deleted successfully');
+        closeReportModal();
+        loadView(currentView);
     } catch (error) {
-        console.error('Error downloading conversation:', error);
-        alert('Failed to download conversation');
+        console.error('Error deleting social post:', error);
+        alert('Failed to delete social post');
     }
 }
 
@@ -660,6 +672,256 @@ async function tempBanUser(userId, username, reportId) {
     }
 }
 
+// ===== USER MANAGEMENT VIEW =====
+async function renderUsers(container) {
+    container.innerHTML = '<div class="loading">Loading users...</div>';
+
+    try {
+        // For now, we'll use a mock endpoint - replace with actual API
+        const users = await apiCall('/users').catch(() => {
+            // Fallback to empty array if endpoint doesn't exist yet
+            return [];
+        });
+
+        container.innerHTML = `
+            <h1 style="font-size: 2rem; margin-bottom: 2rem;">User Management</h1>
+            
+            <div class="content-section">
+                <div class="section-header" style="display: flex; justify-content: space-between; align-items: center;">
+                    <h2 class="section-title">All Users</h2>
+                    <div style="display: flex; gap: 1rem;">
+                        <input type="text" id="userSearch" placeholder="Search users..." style="padding: 0.5rem 1rem; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-bg-secondary); color: var(--color-text-primary);">
+                        <select id="userStatusFilter" style="padding: 0.5rem 1rem; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-bg-secondary); color: var(--color-text-primary);">
+                            <option value="">All Status</option>
+                            <option value="active">Active</option>
+                            <option value="banned">Banned</option>
+                            <option value="warned">Warned</option>
+                        </select>
+                    </div>
+                </div>
+                ${users.length === 0 ?
+                '<div class="loading">User management endpoint not yet implemented. This is a placeholder view.</div>' :
+                `<table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Username</th>
+                                <th>Display Name</th>
+                                <th>Email</th>
+                                <th>Status</th>
+                                <th>Joined</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="usersTableBody">
+                            ${users.map(user => `
+                                <tr>
+                                    <td>${user.id}</td>
+                                    <td>@${user.username}</td>
+                                    <td>${user.display_name}</td>
+                                    <td>${user.email || 'N/A'}</td>
+                                    <td><span class="badge badge-${user.status || 'active'}">${user.status || 'active'}</span></td>
+                                    <td>${new Date(user.created_at).toLocaleDateString()}</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-primary" onclick="viewUserDetail(${user.id})">View</button>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>`
+            }
+            </div>
+        `;
+
+        // Add search functionality
+        const searchInput = document.getElementById('userSearch');
+        const statusFilter = document.getElementById('userStatusFilter');
+
+        if (searchInput && statusFilter) {
+            const filterUsers = () => {
+                const searchTerm = searchInput.value.toLowerCase();
+                const statusValue = statusFilter.value;
+                const rows = document.querySelectorAll('#usersTableBody tr');
+
+                rows.forEach(row => {
+                    const text = row.textContent.toLowerCase();
+                    const matchesSearch = text.includes(searchTerm);
+                    const status = row.querySelector('.badge')?.textContent.toLowerCase() || 'active';
+                    const matchesStatus = !statusValue || status === statusValue;
+
+                    row.style.display = matchesSearch && matchesStatus ? '' : 'none';
+                });
+            };
+
+            searchInput.addEventListener('input', filterUsers);
+            statusFilter.addEventListener('change', filterUsers);
+        }
+    } catch (error) {
+        console.error('Error loading users:', error);
+        container.innerHTML = '<div class="loading" style="color: var(--color-danger);">Failed to load users</div>';
+    }
+}
+
+async function viewUserDetail(userId) {
+    alert(`User detail view for user ID: ${userId}\n\nThis feature will show:\n- User profile information\n- Post history\n- Report history\n- Moderation actions (ban, warn, delete account)`);
+    // TODO: Implement full user detail modal
+}
+
+// ===== ANALYTICS VIEW =====
+async function renderAnalytics(container) {
+    container.innerHTML = '<div class="loading">Loading analytics...</div>';
+
+    try {
+        const analytics = await apiCall('/analytics').catch(() => ({
+            reports_by_day: [],
+            reports_by_reason: {},
+            moderator_stats: [],
+            avg_response_time: 0
+        }));
+
+        container.innerHTML = `
+            <h1 style="font-size: 2rem; margin-bottom: 2rem;">Analytics Dashboard</h1>
+            
+            <div class="stats-grid" style="margin-bottom: 2rem;">
+                <div class="stat-card">
+                    <div class="stat-card-header">
+                        <span class="stat-card-title">Avg Response Time</span>
+                    </div>
+                    <div class="stat-card-value">${analytics.avg_response_time || 0}h</div>
+                    <div class="stat-card-label">Hours to first response</div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-card-header">
+                        <span class="stat-card-title">Reports This Week</span>
+                    </div>
+                    <div class="stat-card-value">${analytics.reports_this_week || 0}</div>
+                    <div class="stat-card-label">Last 7 days</div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-card-header">
+                        <span class="stat-card-title">Resolution Rate</span>
+                    </div>
+                    <div class="stat-card-value">${analytics.resolution_rate || 0}%</div>
+                    <div class="stat-card-label">Reports resolved</div>
+                </div>
+            </div>
+            
+            <div class="content-section">
+                <div class="section-header">
+                    <h2 class="section-title">Reports by Reason</h2>
+                </div>
+                <div style="background: var(--color-bg-tertiary); padding: 2rem; border-radius: var(--radius-md);">
+                    ${Object.keys(analytics.reports_by_reason).length === 0 ?
+                '<p style="color: var(--color-text-secondary);">No data available</p>' :
+                Object.entries(analytics.reports_by_reason).map(([reason, count]) => `
+                            <div style="margin-bottom: 1rem;">
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                                    <span>${reason}</span>
+                                    <span><strong>${count}</strong></span>
+                                </div>
+                                <div style="background: var(--color-bg-primary); height: 8px; border-radius: 4px; overflow: hidden;">
+                                    <div style="background: var(--color-primary); height: 100%; width: ${(count / Math.max(...Object.values(analytics.reports_by_reason))) * 100}%;"></div>
+                                </div>
+                            </div>
+                        `).join('')
+            }
+                </div>
+            </div>
+            
+            <div class="content-section" style="margin-top: 2rem;">
+                <div class="section-header">
+                    <h2 class="section-title">Moderator Performance</h2>
+                </div>
+                ${analytics.moderator_stats.length === 0 ?
+                '<div class="loading">No moderator statistics available</div>' :
+                `<table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Moderator</th>
+                                <th>Reports Handled</th>
+                                <th>Avg Response Time</th>
+                                <th>Resolution Rate</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${analytics.moderator_stats.map(mod => `
+                                <tr>
+                                    <td>@${mod.username}</td>
+                                    <td>${mod.reports_handled}</td>
+                                    <td>${mod.avg_response_time}h</td>
+                                    <td>${mod.resolution_rate}%</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>`
+            }
+            </div>
+        `;
+    } catch (error) {
+        console.error('Error loading analytics:', error);
+        container.innerHTML = '<div class="loading" style="color: var(--color-danger);">Failed to load analytics</div>';
+    }
+}
+
+// ===== AUDIT LOG VIEW =====
+async function renderAuditLog(container) {
+    container.innerHTML = '<div class="loading">Loading audit log...</div>';
+
+    try {
+        const auditLogs = await apiCall('/audit-log').catch(() => []);
+
+        container.innerHTML = `
+            <h1 style="font-size: 2rem; margin-bottom: 2rem;">Audit Log</h1>
+            
+            <div class="content-section">
+                <div class="section-header" style="display: flex; justify-content: space-between; align-items: center;">
+                    <h2 class="section-title">Moderation Actions</h2>
+                    <div style="display: flex; gap: 1rem;">
+                        <select id="auditActionFilter" style="padding: 0.5rem 1rem; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-bg-secondary); color: var(--color-text-primary);">
+                            <option value="">All Actions</option>
+                            <option value="ban">Bans</option>
+                            <option value="delete">Deletions</option>
+                            <option value="warn">Warnings</option>
+                            <option value="resolve">Resolutions</option>
+                        </select>
+                        <input type="date" id="auditDateFilter" style="padding: 0.5rem 1rem; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-bg-secondary); color: var(--color-text-primary);">
+                    </div>
+                </div>
+                ${auditLogs.length === 0 ?
+                '<div class="loading">No audit logs found. This feature tracks all moderation actions.</div>' :
+                `<table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>Moderator</th>
+                                <th>Action</th>
+                                <th>Target</th>
+                                <th>Details</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${auditLogs.map(log => `
+                                <tr>
+                                    <td>${new Date(log.timestamp).toLocaleString()}</td>
+                                    <td>@${log.moderator_username}</td>
+                                    <td><span class="badge badge-${log.action}">${log.action}</span></td>
+                                    <td>${log.target_type}: ${log.target_id}</td>
+                                    <td style="max-width: 300px;">${escapeHTML(log.details || '')}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>`
+            }
+            </div>
+        `;
+    } catch (error) {
+        console.error('Error loading audit log:', error);
+        container.innerHTML = '<div class="loading" style="color: var(--color-danger);">Failed to load audit log</div>';
+    }
+}
+
 // Make functions globally available
 window.viewReport = viewReport;
 window.closeReportModal = closeReportModal;
@@ -673,4 +935,5 @@ window.unlockConversation = unlockConversation;
 window.downloadConversation = downloadConversation;
 window.deleteReportedPost = deleteReportedPost;
 window.tempBanUser = tempBanUser;
+window.viewUserDetail = viewUserDetail;
 
