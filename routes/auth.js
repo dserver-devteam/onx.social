@@ -153,6 +153,7 @@ router.post('/login', async (req, res) => {
                 email: user.email,
                 email_verified: user.email_verified,
                 avatar_url: user.avatar_url,
+                banner_url: user.banner_url,
                 bio: user.bio,
                 role: user.role,
                 status: user.status

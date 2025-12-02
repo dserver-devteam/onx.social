@@ -80,17 +80,44 @@ function supportAuth(pool) {
 }
 
 // Admin login handler
-function adminLogin(req, res) {
-    const { code1, code2, code3 } = req.body;
+async function adminLogin(pool, req, res) {
+    const { username, password } = req.body;
 
-    const validCode1 = process.env.ADMIN_CONFIRMCODE_1;
-    const validCode2 = process.env.ADMIN_CONFIRMCODE_2;
-    const validCode3 = process.env.ADMIN_CONFIRMCODE_3;
+    if (!username || !password) {
+        return res.status(400).json({ error: 'Username and password are required' });
+    }
 
-    if (code1 === validCode1 && code2 === validCode2 && code3 === validCode3) {
+    try {
+        const result = await pool.query(
+            'SELECT * FROM users WHERE username = $1',
+            [username]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(401).json({ error: 'Invalid credentials' });
+        }
+
+        const user = result.rows[0];
+
+        if (user.role !== 'admin') {
+            return res.status(403).json({ error: 'Access denied. Admin privileges required.' });
+        }
+
+        // Verify password
+        const { comparePassword } = require('../utils/password');
+        const isValidPassword = await comparePassword(password, user.password_hash);
+
+        if (!isValidPassword) {
+            return res.status(401).json({ error: 'Invalid credentials' });
+        }
+
         const token = generateToken();
         sessions.set(token, {
-            user: { type: 'admin' },
+            user: {
+                id: user.id,
+                username: user.username,
+                role: user.role
+            },
             timestamp: Date.now()
         });
 
@@ -99,11 +126,9 @@ function adminLogin(req, res) {
             token,
             message: 'Admin authentication successful'
         });
-    } else {
-        res.status(401).json({
-            success: false,
-            error: 'Invalid confirmation codes'
-        });
+    } catch (error) {
+        console.error('Admin login error:', error);
+        res.status(500).json({ error: 'Login failed' });
     }
 }
 

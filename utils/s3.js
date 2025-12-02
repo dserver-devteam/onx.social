@@ -2,6 +2,7 @@ const { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } = re
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const { Upload } = require('@aws-sdk/lib-storage');
 const crypto = require('crypto');
+const path = require('path');
 
 // Initialize S3 client for Garage
 const s3Client = new S3Client({
@@ -11,7 +12,9 @@ const s3Client = new S3Client({
         accessKeyId: process.env.S3_ACCESS_KEY_ID,
         secretAccessKey: process.env.S3_SECRET_ACCESS_KEY
     },
-    forcePathStyle: true // Required for Garage
+    forcePathStyle: true, // Required for Garage
+    requestChecksumCalculation: 'WHEN_REQUIRED',
+    responseChecksumValidation: 'WHEN_REQUIRED'
 });
 
 // Bucket names
@@ -49,9 +52,9 @@ async function uploadToS3(fileBuffer, bucket, contentType, prefix = '') {
 
     await upload.done();
 
-    // Return public URL
-    const endpoint = process.env.S3_PUBLIC_ENDPOINT || process.env.S3_ENDPOINT || 'http://192.168.178.199:3900';
-    return `${endpoint}/${bucket}/${filename}`;
+    // Return proxy URL
+    // Format: /api/proxy/image/:bucket/:filename
+    return `/api/proxy/image/${bucket}/${filename}`;
 }
 
 /**
@@ -159,6 +162,32 @@ async function generatePresignedUrl(bucket, key, expiresIn = 3600) {
     return await getSignedUrl(s3Client, command, { expiresIn });
 }
 
+/**
+ * Get a readable stream for an S3 object
+ * @param {string} bucket - Bucket name
+ * @param {string} key - Object key
+ * @returns {Promise<ReadableStream>} - Readable stream of the object
+ */
+async function getFileStream(bucket, key) {
+    const command = new GetObjectCommand({
+        Bucket: bucket,
+        Key: key
+    });
+
+    const response = await s3Client.send(command);
+    return response.Body;
+}
+
+/**
+ * Get proxy URL for a file
+ * @param {string} bucket - Bucket name
+ * @param {string} key - Object key
+ * @returns {string} - Proxy URL
+ */
+function getProxyUrl(bucket, key) {
+    return `/api/proxy/image/${bucket}/${key}`;
+}
+
 module.exports = {
     s3Client,
     BUCKETS,
@@ -167,5 +196,8 @@ module.exports = {
     isValidMediaType,
     isValidFileSize,
     getExtensionFromMimeType,
-    generatePresignedUrl
+    getExtensionFromMimeType,
+    generatePresignedUrl,
+    getFileStream,
+    getProxyUrl
 };

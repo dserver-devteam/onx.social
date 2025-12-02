@@ -242,4 +242,38 @@ router.get('/my-channels', async (req, res) => {
     }
 });
 
+// Delete channel (creator only)
+router.delete('/channels/:id', async (req, res) => {
+    const { user_id } = req.body;
+
+    if (!user_id) {
+        return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    try {
+        // Check if user is the channel creator
+        const channelCheck = await req.pool.query(`
+            SELECT creator_id FROM update_channels WHERE id = $1
+        `, [req.params.id]);
+
+        if (channelCheck.rows.length === 0) {
+            return res.status(404).json({ error: 'Channel not found' });
+        }
+
+        if (channelCheck.rows[0].creator_id !== user_id) {
+            return res.status(403).json({ error: 'Only channel creator can delete the channel' });
+        }
+
+        // Delete the channel (cascading deletes will handle followers and updates)
+        await req.pool.query(`
+            DELETE FROM update_channels WHERE id = $1
+        `, [req.params.id]);
+
+        res.json({ message: 'Channel deleted successfully' });
+    } catch (error) {
+        console.error('Error deleting channel:', error);
+        res.status(500).json({ error: 'Failed to delete channel' });
+    }
+});
+
 module.exports = router;

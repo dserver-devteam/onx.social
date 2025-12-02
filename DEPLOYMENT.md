@@ -1,8 +1,8 @@
-# ONX Social - Deployment Guide
+# RealTalk - Deployment Guide
 
 ## Quick Start (Already Running)
 
-Your ONX Social application is currently running at:
+Your RealTalk application is currently running at:
 - **URL:** http://localhost:3000
 - **Database:** Connected to PostgreSQL (testdb_ph3c)
 - **Status:** ✅ Active

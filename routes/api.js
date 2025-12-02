@@ -2,7 +2,7 @@ const express = require('express');
 const { Pool } = require('pg');
 const multer = require('multer');
 const axios = require('axios');
-const { generatePresignedUrl, uploadToS3, deleteFromS3, isValidMediaType, isValidFileSize, BUCKETS } = require('../utils/s3');
+const { getProxyUrl, getFileStream, uploadToS3, deleteFromS3, isValidMediaType, isValidFileSize, BUCKETS } = require('../utils/s3');
 const { getRecommendationsForUser, clearUserCache } = require('../utils/llm-recommender');
 const { generateEncryptionKey, encrypt, decrypt } = require('../utils/encryption');
 const {
@@ -111,6 +111,7 @@ router.get('/posts', async (req, res) => {
                     p.media_url,
                     p.media_type,
                     p.created_at,
+                    p.quote_id,
                     u.id as user_id,
                     u.username,
                     u.display_name,
@@ -120,14 +121,29 @@ router.get('/posts', async (req, res) => {
                     COUNT(DISTINCT rep.id) as reply_count,
                     EXISTS(SELECT 1 FROM likes WHERE post_id = p.id AND user_id = $2) as user_liked,
                     EXISTS(SELECT 1 FROM reposts WHERE post_id = p.id AND user_id = $2) as user_reposted,
-                    EXISTS(SELECT 1 FROM bookmarks WHERE post_id = p.id AND user_id = $2) as user_bookmarked
+                    EXISTS(SELECT 1 FROM bookmarks WHERE post_id = p.id AND user_id = $2) as user_bookmarked,
+                    CASE WHEN p.quote_id IS NOT NULL THEN 
+                        json_build_object(
+                            'id', qp.id,
+                            'content', qp.content,
+                            'media_url', qp.media_url,
+                            'media_type', qp.media_type,
+                            'created_at', qp.created_at,
+                            'user_id', qu.id,
+                            'username', qu.username,
+                            'display_name', qu.display_name,
+                            'avatar_url', qu.avatar_url
+                        )
+                    ELSE NULL END as quoted_post
                 FROM posts p
                 JOIN users u ON p.user_id = u.id
+                LEFT JOIN posts qp ON p.quote_id = qp.id
+                LEFT JOIN users qu ON qp.user_id = qu.id
                 LEFT JOIN likes l ON p.id = l.post_id
                 LEFT JOIN reposts r ON p.id = r.post_id
                 LEFT JOIN replies rep ON p.id = rep.post_id
                 WHERE p.user_id = $1
-                GROUP BY p.id, u.id, u.username, u.display_name, u.avatar_url
+                GROUP BY p.id, u.id, u.username, u.display_name, u.avatar_url, qp.id, qu.id, qu.username, qu.display_name, qu.avatar_url
                 ORDER BY p.created_at DESC
                 LIMIT $3 OFFSET $4
             `;
@@ -143,6 +159,7 @@ router.get('/posts', async (req, res) => {
                     p.media_url,
                     p.media_type,
                     p.created_at,
+                    p.quote_id,
                     u.id as user_id,
                     u.username,
                     u.display_name,
@@ -152,14 +169,29 @@ router.get('/posts', async (req, res) => {
                     COUNT(DISTINCT rep.id) as reply_count,
                     EXISTS(SELECT 1 FROM likes WHERE post_id = p.id AND user_id = $1) as user_liked,
                     EXISTS(SELECT 1 FROM reposts WHERE post_id = p.id AND user_id = $1) as user_reposted,
-                    EXISTS(SELECT 1 FROM bookmarks WHERE post_id = p.id AND user_id = $1) as user_bookmarked
+                    EXISTS(SELECT 1 FROM bookmarks WHERE post_id = p.id AND user_id = $1) as user_bookmarked,
+                    CASE WHEN p.quote_id IS NOT NULL THEN 
+                        json_build_object(
+                            'id', qp.id,
+                            'content', qp.content,
+                            'media_url', qp.media_url,
+                            'media_type', qp.media_type,
+                            'created_at', qp.created_at,
+                            'user_id', qu.id,
+                            'username', qu.username,
+                            'display_name', qu.display_name,
+                            'avatar_url', qu.avatar_url
+                        )
+                    ELSE NULL END as quoted_post
                 FROM posts p
                 JOIN users u ON p.user_id = u.id
+                LEFT JOIN posts qp ON p.quote_id = qp.id
+                LEFT JOIN users qu ON qp.user_id = qu.id
                 LEFT JOIN likes l ON p.id = l.post_id
                 LEFT JOIN reposts r ON p.id = r.post_id
                 LEFT JOIN replies rep ON p.id = rep.post_id
                 WHERE p.user_id = $1
-                GROUP BY p.id, u.id, u.username, u.display_name, u.avatar_url
+                GROUP BY p.id, u.id, u.username, u.display_name, u.avatar_url, qp.id, qu.id, qu.username, qu.display_name, qu.avatar_url
                 ORDER BY p.created_at DESC
                 LIMIT $2 OFFSET $3
             `;
@@ -230,8 +262,8 @@ router.get('/posts', async (req, res) => {
             posts = result.rows;
         }
 
-        // Generate pre-signed URLs for media
-        posts = await Promise.all(posts.map(async (post) => {
+        // Generate proxy URLs for media
+        posts = posts.map(post => {
             if (post.media_url) {
                 try {
                     // Extract bucket and key from URL
@@ -240,15 +272,15 @@ router.get('/posts', async (req, res) => {
                     if (pathParts.length >= 2) {
                         const bucket = pathParts[0];
                         const key = pathParts.slice(1).join('/');
-                        // Generate pre-signed URL (valid for 1 hour)
-                        post.media_url = await generatePresignedUrl(bucket, key, 3600);
+                        // Generate proxy URL
+                        post.media_url = getProxyUrl(bucket, key);
                     }
                 } catch (error) {
-                    console.error('Error generating pre-signed URL:', error);
+                    console.error('Error generating proxy URL:', error);
                 }
             }
             return post;
-        }));
+        });
 
         res.json(posts);
     } catch (error) {
@@ -364,8 +396,8 @@ router.get('/feed/recommended', async (req, res) => {
 
             console.log(`[Feed] Returning ${posts.length} posts in algorithm order`);
 
-            // Generate pre-signed URLs for media
-            posts = await Promise.all(posts.map(async (post) => {
+            // Generate proxy URLs for media
+            posts = posts.map(post => {
                 if (post.media_url) {
                     try {
                         const url = new URL(post.media_url);
@@ -373,14 +405,14 @@ router.get('/feed/recommended', async (req, res) => {
                         if (pathParts.length >= 2) {
                             const bucket = pathParts[0];
                             const key = pathParts.slice(1).join('/');
-                            post.media_url = await generatePresignedUrl(bucket, key, 3600);
+                            post.media_url = getProxyUrl(bucket, key);
                         }
                     } catch (error) {
-                        console.error('Error generating pre-signed URL:', error);
+                        console.error('Error generating proxy URL:', error);
                     }
                 }
                 return post;
-            }));
+            });
 
             console.log(`[Feed] ✅ Generated addictive feed for user ${user_id} (${posts.length} posts)`);
 
@@ -435,8 +467,8 @@ router.get('/feed/recommended', async (req, res) => {
             const result = await pool.query(fallbackQuery, [user_id, limitNum]);
             let posts = result.rows;
 
-            // Generate pre-signed URLs for media
-            posts = await Promise.all(posts.map(async (post) => {
+            // Generate proxy URLs for media
+            posts = posts.map(post => {
                 if (post.media_url) {
                     try {
                         const url = new URL(post.media_url);
@@ -444,14 +476,14 @@ router.get('/feed/recommended', async (req, res) => {
                         if (pathParts.length >= 2) {
                             const bucket = pathParts[0];
                             const key = pathParts.slice(1).join('/');
-                            post.media_url = await generatePresignedUrl(bucket, key, 3600);
+                            post.media_url = getProxyUrl(bucket, key);
                         }
                     } catch (error) {
-                        console.error('Error generating pre-signed URL:', error);
+                        console.error('Error generating proxy URL:', error);
                     }
                 }
                 return post;
-            }));
+            });
 
             console.log(`[Feed] Fallback to chronological feed for user ${user_id} (${posts.length} posts)`);
             res.json(posts);
@@ -609,54 +641,168 @@ router.post('/sync-follows', async (req, res) => {
 
 
 
-// POST /api/posts - Create a new post
-router.post('/posts', async (req, res) => {
-    try {
-        const { user_id, content, media_url, media_type } = req.body;
+// Configure multer for memory storage
+const uploadPost = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+        fileSize: 50 * 1024 * 1024 // 50MB max
+    }
+});
 
-        if (!content || content.trim().length === 0) {
-            return res.status(400).json({ error: 'Content is required' });
+// POST /api/posts - Create a new post
+router.post('/posts', uploadPost.array('media', 4), async (req, res) => {
+    try {
+        const { content, parent_id, quote_id, user_id } = req.body;
+
+        // Require authentication
+        if (!user_id) {
+            return res.status(401).json({ error: 'Authentication required' });
         }
 
-        if (content.length > 280) {
+        if ((!content || content.trim().length === 0) && (!req.files || req.files.length === 0)) {
+            return res.status(400).json({ error: 'Content or media is required' });
+        }
+
+        if (content && content.length > 280) {
             return res.status(400).json({ error: 'Content must be 280 characters or less' });
         }
 
-        // Validate media_type if media_url is provided
-        if (media_url && media_type && !['image', 'video'].includes(media_type)) {
-            return res.status(400).json({ error: 'Invalid media type' });
+        let mediaUrls = [];
+        let mediaType = null;
+
+        // Handle file uploads
+        if (req.files && req.files.length > 0) {
+            const uploadPromises = req.files.map(async (file) => {
+                // Validate file type
+                if (!isValidMediaType(file.mimetype)) {
+                    throw new Error('Invalid file type');
+                }
+
+                const isImage = file.mimetype.startsWith('image/');
+                const type = isImage ? 'image' : 'video';
+
+                // Set main media type based on first file (or mixed? Schema has single media_type)
+                if (!mediaType) mediaType = type;
+
+                const prefix = isImage ? 'img-' : 'vid-';
+                return uploadToS3(
+                    file.buffer,
+                    BUCKETS.PICTURE_DATA,
+                    file.mimetype,
+                    prefix
+                );
+            });
+
+            mediaUrls = await Promise.all(uploadPromises);
         }
 
         const query = `
-      INSERT INTO posts (user_id, content, media_url, media_type)
-      VALUES ($1, $2, $3, $4)
+      INSERT INTO posts (user_id, content, media_url, media_type, media_urls, parent_id, quote_id)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
       RETURNING *
     `;
 
         const result = await pool.query(query, [
-            user_id || 1,
-            content,
-            media_url || null,
-            media_type || null
+            user_id,
+            content || '',
+            mediaUrls[0] || null, // Legacy support
+            mediaType,
+            mediaUrls,
+            parent_id || null,
+            quote_id || null
         ]);
+
+
 
         const newPost = result.rows[0];
 
+        // Process hashtags
+        if (content) {
+            const { processPostHashtags } = require('./trending');
+            await processPostHashtags(pool, newPost.id, content);
+        }
 
         // Track post creation
-        await trackEvent(user_id || 1, 'post_create', {
+        await trackEvent(user_id, 'post_create', {
             postId: newPost.id,
-            hasMedia: !!media_url
+            hasMedia: mediaUrls.length > 0,
+            isReply: !!parent_id,
+            isQuote: !!quote_id
         }, req);
 
         // Sync to algorithm service
         syncPostToAlgorithm(newPost);
 
-
         res.status(201).json(newPost);
     } catch (error) {
         console.error('Error creating post:', error);
-        res.status(500).json({ error: 'Failed to create post' });
+        res.status(500).json({ error: 'Failed to create post: ' + error.message });
+    }
+});
+
+// GET /api/posts/following - Get posts from followed users
+router.get('/posts/following', async (req, res) => {
+    try {
+        const { user_id, limit = 20, offset = 0 } = req.query;
+        const limitNum = parseInt(limit);
+        const offsetNum = parseInt(offset);
+
+        if (!user_id) {
+            return res.status(400).json({ error: 'user_id is required' });
+        }
+
+        const query = `
+            SELECT 
+                p.id,
+                p.content,
+                p.media_url,
+                p.media_type,
+                p.created_at,
+                p.quote_id,
+                u.id as user_id,
+                u.username,
+                u.display_name,
+                u.avatar_url,
+                COUNT(DISTINCT l.id) as like_count,
+                COUNT(DISTINCT r.id) as repost_count,
+                COUNT(DISTINCT rep.id) as reply_count,
+                EXISTS(SELECT 1 FROM likes WHERE post_id = p.id AND user_id = $1) as user_liked,
+                EXISTS(SELECT 1 FROM reposts WHERE post_id = p.id AND user_id = $1) as user_reposted,
+                EXISTS(SELECT 1 FROM bookmarks WHERE post_id = p.id AND user_id = $1) as user_bookmarked,
+                CASE WHEN p.quote_id IS NOT NULL THEN 
+                    json_build_object(
+                        'id', qp.id,
+                        'content', qp.content,
+                        'media_url', qp.media_url,
+                        'media_type', qp.media_type,
+                        'created_at', qp.created_at,
+                        'user_id', qu.id,
+                        'username', qu.username,
+                        'display_name', qu.display_name,
+                        'avatar_url', qu.avatar_url
+                    )
+                ELSE NULL END as quoted_post
+            FROM posts p
+            JOIN users u ON p.user_id = u.id
+            LEFT JOIN posts qp ON p.quote_id = qp.id
+            LEFT JOIN users qu ON qp.user_id = qu.id
+            LEFT JOIN likes l ON p.id = l.post_id
+            LEFT JOIN reposts r ON p.id = r.post_id
+            LEFT JOIN replies rep ON p.id = rep.post_id
+            WHERE p.user_id IN (
+                SELECT following_id FROM follows WHERE follower_id = $1
+            )
+            AND p.parent_id IS NULL
+            GROUP BY p.id, u.id, u.username, u.display_name, u.avatar_url, qp.id, qu.id, qu.username, qu.display_name, qu.avatar_url
+            ORDER BY p.created_at DESC
+            LIMIT $2 OFFSET $3
+        `;
+
+        const result = await pool.query(query, [user_id, limitNum, offsetNum]);
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Error fetching following feed:', error);
+        res.status(500).json({ error: 'Failed to fetch following feed' });
     }
 });
 
@@ -670,7 +816,10 @@ router.get('/posts/:id', async (req, res) => {
       SELECT 
         p.id,
         p.content,
+        p.media_url,
+        p.media_type,
         p.created_at,
+        p.quote_id,
         u.id as user_id,
         u.username,
         u.display_name,
@@ -680,15 +829,31 @@ router.get('/posts/:id', async (req, res) => {
         COUNT(DISTINCT rep.id) as reply_count,
         ${user_id ? `
         EXISTS(SELECT 1 FROM likes WHERE post_id = p.id AND user_id = $2) as user_liked,
-        EXISTS(SELECT 1 FROM reposts WHERE post_id = p.id AND user_id = $2) as user_reposted
-        ` : 'false as user_liked, false as user_reposted'}
+        EXISTS(SELECT 1 FROM reposts WHERE post_id = p.id AND user_id = $2) as user_reposted,
+        EXISTS(SELECT 1 FROM bookmarks WHERE post_id = p.id AND user_id = $2) as user_bookmarked,
+        ` : 'false as user_liked, false as user_reposted, false as user_bookmarked,'}
+        CASE WHEN p.quote_id IS NOT NULL THEN 
+            json_build_object(
+                'id', qp.id,
+                'content', qp.content,
+                'media_url', qp.media_url,
+                'media_type', qp.media_type,
+                'created_at', qp.created_at,
+                'user_id', qu.id,
+                'username', qu.username,
+                'display_name', qu.display_name,
+                'avatar_url', qu.avatar_url
+            )
+        ELSE NULL END as quoted_post
       FROM posts p
       JOIN users u ON p.user_id = u.id
+      LEFT JOIN posts qp ON p.quote_id = qp.id
+      LEFT JOIN users qu ON qp.user_id = qu.id
       LEFT JOIN likes l ON p.id = l.post_id
       LEFT JOIN reposts r ON p.id = r.post_id
       LEFT JOIN replies rep ON p.id = rep.post_id
       WHERE p.id = $1
-      GROUP BY p.id, u.id, u.username, u.display_name, u.avatar_url
+      GROUP BY p.id, u.id, u.username, u.display_name, u.avatar_url, qp.id, qu.id, qu.username, qu.display_name, qu.avatar_url
     `;
 
         const result = user_id
@@ -703,6 +868,98 @@ router.get('/posts/:id', async (req, res) => {
     } catch (error) {
         console.error('Error fetching post:', error);
         res.status(500).json({ error: 'Failed to fetch post' });
+    }
+});
+
+// PUT /api/posts/:id - Edit a post
+router.put('/posts/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { content, user_id } = req.body;
+
+        if (!content || content.trim().length === 0) {
+            return res.status(400).json({ error: 'Content is required' });
+        }
+
+        // Verify ownership
+        const checkQuery = 'SELECT user_id FROM posts WHERE id = $1';
+        const checkResult = await pool.query(checkQuery, [id]);
+
+        if (checkResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Post not found' });
+        }
+
+        // In production, use req.user.id from auth middleware
+        // Here we trust the body user_id if provided, or check against session
+        const ownerId = checkResult.rows[0].user_id;
+        if (user_id && parseInt(user_id) !== ownerId) {
+            return res.status(403).json({ error: 'Unauthorized' });
+        }
+
+        const query = `
+            UPDATE posts 
+            SET content = $1, is_edited = true, updated_at = NOW()
+            WHERE id = $2
+            RETURNING *
+        `;
+
+        const result = await pool.query(query, [content, id]);
+
+        // Sync to algorithm (update content)
+        syncPostToAlgorithm(result.rows[0]);
+
+        res.json(result.rows[0]);
+    } catch (error) {
+        console.error('Error editing post:', error);
+        res.status(500).json({ error: 'Failed to edit post' });
+    }
+});
+
+// GET /api/posts/:id/analytics
+router.get('/posts/:id/analytics', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { user_id } = req.query;
+
+        // Verify ownership
+        const checkQuery = 'SELECT user_id FROM posts WHERE id = $1';
+        const checkResult = await pool.query(checkQuery, [id]);
+
+        if (checkResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Post not found' });
+        }
+
+        // In production use req.user.id
+        const ownerId = checkResult.rows[0].user_id;
+        if (user_id && parseInt(user_id) !== ownerId) {
+            return res.status(403).json({ error: 'Unauthorized' });
+        }
+
+        const query = `
+            SELECT 
+                (SELECT COUNT(*) FROM post_views WHERE post_id = $1) as impressions,
+                (SELECT COUNT(*) FROM likes WHERE post_id = $1) as likes,
+                (SELECT COUNT(*) FROM reposts WHERE post_id = $1) as reposts,
+                (SELECT COUNT(*) FROM replies WHERE post_id = $1) as replies,
+                (SELECT COUNT(*) FROM bookmarks WHERE post_id = $1) as bookmarks
+        `;
+
+        const result = await pool.query(query, [id]);
+        const data = result.rows[0];
+
+        // Calculate engagement rate
+        const engagements = parseInt(data.likes) + parseInt(data.reposts) + parseInt(data.replies) + parseInt(data.bookmarks);
+        const impressions = parseInt(data.impressions) || 1; // Avoid division by zero
+        const engagementRate = ((engagements / impressions) * 100).toFixed(1);
+
+        res.json({
+            ...data,
+            engagements,
+            engagement_rate: engagementRate
+        });
+    } catch (error) {
+        console.error('Error fetching analytics:', error);
+        res.status(500).json({ error: 'Failed to fetch analytics' });
     }
 });
 
@@ -742,23 +999,57 @@ router.delete('/posts/:id', async (req, res) => {
 router.get('/posts/:id/replies', async (req, res) => {
     try {
         const { id } = req.params;
+        const { user_id } = req.query;
 
         const query = `
-      SELECT 
-        rep.id,
-        rep.content,
-        rep.created_at,
-        u.id as user_id,
-        u.username,
-        u.display_name,
-        u.avatar_url
-      FROM replies rep
-      JOIN users u ON rep.user_id = u.id
-      WHERE rep.post_id = $1
-      ORDER BY rep.created_at ASC
-    `;
+            SELECT 
+                p.id,
+                p.content,
+                p.media_url,
+                p.media_type,
+                p.created_at,
+                p.quote_id,
+                u.id as user_id,
+                u.username,
+                u.display_name,
+                u.avatar_url,
+                COUNT(DISTINCT l.id) as like_count,
+                COUNT(DISTINCT r.id) as repost_count,
+                COUNT(DISTINCT rep.id) as reply_count,
+                ${user_id ? `
+                EXISTS(SELECT 1 FROM likes WHERE post_id = p.id AND user_id = $2) as user_liked,
+                EXISTS(SELECT 1 FROM reposts WHERE post_id = p.id AND user_id = $2) as user_reposted,
+                EXISTS(SELECT 1 FROM bookmarks WHERE post_id = p.id AND user_id = $2) as user_bookmarked,
+                ` : 'false as user_liked, false as user_reposted, false as user_bookmarked,'}
+                CASE WHEN p.quote_id IS NOT NULL THEN 
+                    json_build_object(
+                        'id', qp.id,
+                        'content', qp.content,
+                        'media_url', qp.media_url,
+                        'media_type', qp.media_type,
+                        'created_at', qp.created_at,
+                        'user_id', qu.id,
+                        'username', qu.username,
+                        'display_name', qu.display_name,
+                        'avatar_url', qu.avatar_url
+                    )
+                ELSE NULL END as quoted_post
+            FROM posts p
+            JOIN users u ON p.user_id = u.id
+            LEFT JOIN posts qp ON p.quote_id = qp.id
+            LEFT JOIN users qu ON qp.user_id = qu.id
+            LEFT JOIN likes l ON p.id = l.post_id
+            LEFT JOIN reposts r ON p.id = r.post_id
+            LEFT JOIN replies rep ON p.id = rep.post_id
+            WHERE p.parent_id = $1
+            GROUP BY p.id, u.id, u.username, u.display_name, u.avatar_url, qp.id, qu.id, qu.username, qu.display_name, qu.avatar_url
+            ORDER BY p.created_at ASC
+        `;
 
-        const result = await pool.query(query, [id]);
+        const result = user_id
+            ? await pool.query(query, [id, user_id])
+            : await pool.query(query, [id]);
+
         res.json(result.rows);
     } catch (error) {
         console.error('Error fetching replies:', error);
@@ -941,6 +1232,55 @@ router.post('/posts/:id/reply', async (req, res) => {
     }
 });
 
+// GET /api/users/suggestions - Get personalized user suggestions
+router.get('/users/suggestions', async (req, res) => {
+    try {
+        const { user_id, limit = 5 } = req.query;
+        const limitNum = parseInt(limit);
+
+        if (!user_id) {
+            return res.status(400).json({ error: 'user_id is required' });
+        }
+
+        // Get user suggestions based on:
+        // 1. Users not already followed
+        // 2. Active users (posted recently)
+        // 3. Popular users (high follower count)
+        // 4. Mutual connections (follow people who follow people you follow)
+        const query = `
+            SELECT
+                u.id,
+                u.username,
+                u.display_name,
+                u.avatar_url,
+                u.bio,
+                COUNT(DISTINCT f.follower_id) as follower_count,
+                COUNT(DISTINCT p.id) as recent_post_count
+            FROM users u
+            LEFT JOIN follows f ON u.id = f.following_id
+            LEFT JOIN posts p ON u.id = p.user_id AND p.created_at > NOW() - INTERVAL '7 days'
+            WHERE u.id != $1
+            AND u.id NOT IN (
+                SELECT following_id FROM follows WHERE follower_id = $1
+            )
+            AND u.status = 'active'
+            GROUP BY u.id, u.username, u.display_name, u.avatar_url, u.bio
+            HAVING COUNT(DISTINCT p.id) > 0 OR COUNT(DISTINCT f.follower_id) > 0
+            ORDER BY 
+                COUNT(DISTINCT f.follower_id) DESC,
+                COUNT(DISTINCT p.id) DESC,
+                RANDOM()
+            LIMIT $2
+        `;
+
+        const result = await pool.query(query, [user_id, limitNum]);
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Error fetching user suggestions:', error);
+        res.status(500).json({ error: 'Failed to fetch user suggestions' });
+    }
+});
+
 // GET /api/users/:id - Get user profile
 router.get('/users/:id', async (req, res) => {
     try {
@@ -1002,6 +1342,162 @@ router.get('/users/by-username/:username', async (req, res) => {
     } catch (error) {
         console.error('Error fetching user:', error);
         res.status(500).json({ error: 'Failed to fetch user' });
+    }
+});
+
+// GET /api/users/profile/:username - Get user profile by username (with pre-signed URLs)
+router.get('/users/profile/:username', async (req, res) => {
+    try {
+        const { username } = req.params;
+        const { current_user_id } = req.query;
+
+        const query = `
+            SELECT 
+                u.id,
+                u.username,
+                u.display_name,
+                u.email,
+                u.avatar_url,
+                u.banner_url,
+                u.bio,
+                u.location,
+                u.website,
+                u.created_at,
+                (SELECT COUNT(*) FROM posts WHERE user_id = u.id) as posts_count,
+                (SELECT COUNT(*) FROM follows WHERE following_id = u.id) as followers_count,
+                (SELECT COUNT(*) FROM follows WHERE follower_id = u.id) as following_count
+                ${current_user_id ? `,
+                EXISTS(SELECT 1 FROM follows WHERE follower_id = $2 AND following_id = u.id) as is_following
+                ` : ''}
+            FROM users u
+            WHERE LOWER(u.username) = LOWER($1)
+        `;
+
+        const params = current_user_id ? [username, current_user_id] : [username];
+        const result = await pool.query(query, params);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        const userProfile = result.rows[0];
+
+        // Generate pre-signed URLs for avatar and banner (valid for 7 days)
+        if (userProfile.avatar_url && userProfile.avatar_url.startsWith('http')) {
+            try {
+                const url = new URL(userProfile.avatar_url);
+                const pathParts = url.pathname.split('/').filter(p => p);
+                if (pathParts.length >= 2) {
+                    const bucket = pathParts[0];
+                    // Only sign if it's one of our buckets
+                    if (Object.values(BUCKETS).includes(bucket)) {
+                        const key = pathParts.slice(1).join('/');
+                        const presignedUrl = getProxyUrl(bucket, key);
+                        userProfile.avatar_url = presignedUrl;
+                    }
+                }
+            } catch (error) {
+                console.error('Error generating avatar pre-signed URL for user:', userProfile.username, error);
+            }
+        }
+
+        if (userProfile.banner_url && userProfile.banner_url.startsWith('http')) {
+            try {
+                const url = new URL(userProfile.banner_url);
+                const pathParts = url.pathname.split('/').filter(p => p);
+                if (pathParts.length >= 2) {
+                    const bucket = pathParts[0];
+                    // Only sign if it's one of our buckets
+                    if (Object.values(BUCKETS).includes(bucket)) {
+                        const key = pathParts.slice(1).join('/');
+                        const presignedUrl = getProxyUrl(bucket, key);
+                        userProfile.banner_url = presignedUrl;
+                    }
+                }
+            } catch (error) {
+                console.error('Error generating banner pre-signed URL for user:', userProfile.username, error);
+            }
+        }
+
+        res.json(userProfile);
+    } catch (error) {
+        console.error('Error fetching user profile:', error);
+        res.status(500).json({ error: 'Failed to fetch user profile' });
+    }
+});
+
+// GET /api/users/by-username/:username/posts - Get posts by username
+router.get('/users/by-username/:username/posts', async (req, res) => {
+    try {
+        const { username } = req.params;
+        const { user_id, limit = 20, offset = 0 } = req.query;
+        const limitNum = parseInt(limit);
+        const offsetNum = parseInt(offset);
+
+        // First get user ID from username
+        const userResult = await pool.query('SELECT id FROM users WHERE LOWER(username) = LOWER($1)', [username]);
+
+        if (userResult.rows.length === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        const targetUserId = userResult.rows[0].id;
+
+        const query = `
+            SELECT 
+                p.id,
+                p.content,
+                p.media_url,
+                p.media_type,
+                p.created_at,
+                p.quote_id,
+                u.id as user_id,
+                u.username,
+                u.display_name,
+                u.avatar_url,
+                COUNT(DISTINCT l.id) as like_count,
+                COUNT(DISTINCT r.id) as repost_count,
+                COUNT(DISTINCT rep.id) as reply_count,
+                ${user_id ? `
+                EXISTS(SELECT 1 FROM likes WHERE post_id = p.id AND user_id = $3) as user_liked,
+                EXISTS(SELECT 1 FROM reposts WHERE post_id = p.id AND user_id = $3) as user_reposted,
+                EXISTS(SELECT 1 FROM bookmarks WHERE post_id = p.id AND user_id = $3) as user_bookmarked,
+                ` : 'false as user_liked, false as user_reposted, false as user_bookmarked,'}
+                CASE WHEN p.quote_id IS NOT NULL THEN 
+                    json_build_object(
+                        'id', qp.id,
+                        'content', qp.content,
+                        'media_url', qp.media_url,
+                        'media_type', qp.media_type,
+                        'created_at', qp.created_at,
+                        'user_id', qu.id,
+                        'username', qu.username,
+                        'display_name', qu.display_name,
+                        'avatar_url', qu.avatar_url
+                    )
+                ELSE NULL END as quoted_post
+            FROM posts p
+            JOIN users u ON p.user_id = u.id
+            LEFT JOIN posts qp ON p.quote_id = qp.id
+            LEFT JOIN users qu ON qp.user_id = qu.id
+            LEFT JOIN likes l ON p.id = l.post_id
+            LEFT JOIN reposts r ON p.id = r.post_id
+            LEFT JOIN replies rep ON p.id = rep.post_id
+            WHERE p.user_id = $1 AND p.parent_id IS NULL
+            GROUP BY p.id, u.id, u.username, u.display_name, u.avatar_url, qp.id, qu.id, qu.username, qu.display_name, qu.avatar_url
+            ORDER BY p.created_at DESC
+            LIMIT $2 OFFSET ${user_id ? '$4' : '$3'}
+        `;
+
+        const params = user_id
+            ? [targetUserId, limitNum, user_id, offsetNum]
+            : [targetUserId, limitNum, offsetNum];
+
+        const result = await pool.query(query, params);
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Error fetching user posts:', error);
+        res.status(500).json({ error: 'Failed to fetch user posts' });
     }
 });
 
@@ -1179,7 +1675,7 @@ router.post('/users/:id/export-data', async (req, res) => {
         const pathParts = urlObj.pathname.split('/').filter(p => p);
         const key = pathParts.slice(1).join('/');
 
-        const downloadUrl = await generatePresignedUrl(BUCKETS.TEMP_DATA, key, 604800);
+        const downloadUrl = getProxyUrl(BUCKETS.TEMP_DATA, key);
 
         // Send email
         if (user.email) {
@@ -1409,6 +1905,306 @@ router.get('/users/:id/suggested-follows', async (req, res) => {
     }
 });
 
+// GET /api/users/:username/followers - Get user's followers
+router.get('/users/:username/followers', async (req, res) => {
+    try {
+        const { username } = req.params;
+        const { current_user_id, limit = 50, offset = 0 } = req.query;
+
+        // First get the user ID from username
+        const userResult = await pool.query('SELECT id FROM users WHERE LOWER(username) = LOWER($1)', [username]);
+        if (userResult.rows.length === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+        const userId = userResult.rows[0].id;
+
+        const query = `
+            SELECT 
+                u.id,
+                u.username,
+                u.display_name,
+                u.avatar_url,
+                u.bio,
+                (SELECT COUNT(*) FROM follows WHERE following_id = u.id) as followers_count,
+                (SELECT COUNT(*) FROM follows WHERE follower_id = u.id) as following_count
+                ${current_user_id ? `,
+                EXISTS(SELECT 1 FROM follows WHERE follower_id = $3 AND following_id = u.id) as is_following
+                ` : ''}
+            FROM users u
+            JOIN follows f ON u.id = f.follower_id
+            WHERE f.following_id = $1
+            ORDER BY f.created_at DESC
+            LIMIT $2 OFFSET ${current_user_id ? '$4' : '$3'}
+        `;
+
+        const params = current_user_id
+            ? [userId, parseInt(limit), current_user_id, parseInt(offset)]
+            : [userId, parseInt(limit), parseInt(offset)];
+
+        const result = await pool.query(query, params);
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Error fetching followers:', error);
+        res.status(500).json({ error: 'Failed to fetch followers' });
+    }
+});
+
+// GET /api/users/:username/following - Get users the user is following
+router.get('/users/:username/following', async (req, res) => {
+    try {
+        const { username } = req.params;
+        const { current_user_id, limit = 50, offset = 0 } = req.query;
+
+        // First get the user ID from username
+        const userResult = await pool.query('SELECT id FROM users WHERE LOWER(username) = LOWER($1)', [username]);
+        if (userResult.rows.length === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+        const userId = userResult.rows[0].id;
+
+        const query = `
+            SELECT 
+                u.id,
+                u.username,
+                u.display_name,
+                u.avatar_url,
+                u.bio,
+                (SELECT COUNT(*) FROM follows WHERE following_id = u.id) as followers_count,
+                (SELECT COUNT(*) FROM follows WHERE follower_id = u.id) as following_count
+                ${current_user_id ? `,
+                EXISTS(SELECT 1 FROM follows WHERE follower_id = $3 AND following_id = u.id) as is_following
+                ` : ''}
+            FROM users u
+            JOIN follows f ON u.id = f.following_id
+            WHERE f.follower_id = $1
+            ORDER BY f.created_at DESC
+            LIMIT $2 OFFSET ${current_user_id ? '$4' : '$3'}
+        `;
+
+        const params = current_user_id
+            ? [userId, parseInt(limit), current_user_id, parseInt(offset)]
+            : [userId, parseInt(limit), parseInt(offset)];
+
+        const result = await pool.query(query, params);
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Error fetching following:', error);
+        res.status(500).json({ error: 'Failed to fetch following' });
+    }
+});
+
+// GET /api/users/:username/likes - Get posts the user has liked
+router.get('/users/:username/likes', async (req, res) => {
+    try {
+        const { username } = req.params;
+        const { current_user_id, limit = 50, offset = 0 } = req.query;
+
+        // First get the user ID from username
+        const userResult = await pool.query('SELECT id FROM users WHERE LOWER(username) = LOWER($1)', [username]);
+        if (userResult.rows.length === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+        const userId = userResult.rows[0].id;
+
+        const query = `
+            SELECT 
+                p.id,
+                p.content,
+                p.media_url,
+                p.media_type,
+                p.created_at,
+                p.quote_id,
+                u.id as user_id,
+                u.username,
+                u.display_name,
+                u.avatar_url,
+                COUNT(DISTINCT l.id) as like_count,
+                COUNT(DISTINCT r.id) as repost_count,
+                COUNT(DISTINCT rep.id) as reply_count,
+                ${current_user_id ? `
+                EXISTS(SELECT 1 FROM likes WHERE post_id = p.id AND user_id = $3) as user_liked,
+                EXISTS(SELECT 1 FROM reposts WHERE post_id = p.id AND user_id = $3) as user_reposted,
+                EXISTS(SELECT 1 FROM bookmarks WHERE post_id = p.id AND user_id = $3) as user_bookmarked,
+                ` : 'false as user_liked, false as user_reposted, false as user_bookmarked,'}
+                CASE WHEN p.quote_id IS NOT NULL THEN 
+                    json_build_object(
+                        'id', qp.id,
+                        'content', qp.content,
+                        'media_url', qp.media_url,
+                        'media_type', qp.media_type,
+                        'created_at', qp.created_at,
+                        'user_id', qu.id,
+                        'username', qu.username,
+                        'display_name', qu.display_name,
+                        'avatar_url', qu.avatar_url
+                    )
+                ELSE NULL END as quoted_post
+            FROM likes lk
+            JOIN posts p ON lk.post_id = p.id
+            JOIN users u ON p.user_id = u.id
+            LEFT JOIN posts qp ON p.quote_id = qp.id
+            LEFT JOIN users qu ON qp.user_id = qu.id
+            LEFT JOIN likes l ON p.id = l.post_id
+            LEFT JOIN reposts r ON p.id = r.post_id
+            LEFT JOIN replies rep ON p.id = rep.post_id
+            WHERE lk.user_id = $1
+            GROUP BY p.id, u.id, u.username, u.display_name, u.avatar_url, qp.id, qu.id, qu.username, qu.display_name, qu.avatar_url, lk.created_at
+            ORDER BY lk.created_at DESC
+            LIMIT $2 OFFSET ${current_user_id ? '$4' : '$3'}
+        `;
+
+        const params = current_user_id
+            ? [userId, parseInt(limit), current_user_id, parseInt(offset)]
+            : [userId, parseInt(limit), parseInt(offset)];
+
+        const result = await pool.query(query, params);
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Error fetching liked posts:', error);
+        res.status(500).json({ error: 'Failed to fetch liked posts' });
+    }
+});
+
+// GET /api/users/:username/media - Get posts with media from the user
+router.get('/users/:username/media', async (req, res) => {
+    try {
+        const { username } = req.params;
+        const { current_user_id, limit = 50, offset = 0 } = req.query;
+
+        // First get the user ID from username
+        const userResult = await pool.query('SELECT id FROM users WHERE LOWER(username) = LOWER($1)', [username]);
+        if (userResult.rows.length === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+        const userId = userResult.rows[0].id;
+
+        const query = `
+            SELECT 
+                p.id,
+                p.content,
+                p.media_url,
+                p.media_type,
+                p.created_at,
+                p.quote_id,
+                u.id as user_id,
+                u.username,
+                u.display_name,
+                u.avatar_url,
+                COUNT(DISTINCT l.id) as like_count,
+                COUNT(DISTINCT r.id) as repost_count,
+                COUNT(DISTINCT rep.id) as reply_count,
+                ${current_user_id ? `
+                EXISTS(SELECT 1 FROM likes WHERE post_id = p.id AND user_id = $3) as user_liked,
+                EXISTS(SELECT 1 FROM reposts WHERE post_id = p.id AND user_id = $3) as user_reposted,
+                EXISTS(SELECT 1 FROM bookmarks WHERE post_id = p.id AND user_id = $3) as user_bookmarked,
+                ` : 'false as user_liked, false as user_reposted, false as user_bookmarked,'}
+                CASE WHEN p.quote_id IS NOT NULL THEN 
+                    json_build_object(
+                        'id', qp.id,
+                        'content', qp.content,
+                        'media_url', qp.media_url,
+                        'media_type', qp.media_type,
+                        'created_at', qp.created_at,
+                        'user_id', qu.id,
+                        'username', qu.username,
+                        'display_name', qu.display_name,
+                        'avatar_url', qu.avatar_url
+                    )
+                ELSE NULL END as quoted_post
+            FROM posts p
+            JOIN users u ON p.user_id = u.id
+            LEFT JOIN posts qp ON p.quote_id = qp.id
+            LEFT JOIN users qu ON qp.user_id = qu.id
+            LEFT JOIN likes l ON p.id = l.post_id
+            LEFT JOIN reposts r ON p.id = r.post_id
+            LEFT JOIN replies rep ON p.id = rep.post_id
+            WHERE p.user_id = $1 AND p.media_url IS NOT NULL
+            GROUP BY p.id, u.id, u.username, u.display_name, u.avatar_url, qp.id, qu.id, qu.username, qu.display_name, qu.avatar_url
+            ORDER BY p.created_at DESC
+            LIMIT $2 OFFSET ${current_user_id ? '$4' : '$3'}
+        `;
+
+        const params = current_user_id
+            ? [userId, parseInt(limit), current_user_id, parseInt(offset)]
+            : [userId, parseInt(limit), parseInt(offset)];
+
+        const result = await pool.query(query, params);
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Error fetching media posts:', error);
+        res.status(500).json({ error: 'Failed to fetch media posts' });
+    }
+});
+
+// GET /api/users/:username/replies - Get user's replies
+router.get('/users/:username/replies', async (req, res) => {
+    try {
+        const { username } = req.params;
+        const { current_user_id, limit = 50, offset = 0 } = req.query;
+
+        // First get the user ID from username
+        const userResult = await pool.query('SELECT id FROM users WHERE LOWER(username) = LOWER($1)', [username]);
+        if (userResult.rows.length === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+        const userId = userResult.rows[0].id;
+
+        const query = `
+            SELECT 
+                p.id,
+                p.content,
+                p.media_url,
+                p.media_type,
+                p.created_at,
+                p.quote_id,
+                p.reply_to_id,
+                u.id as user_id,
+                u.username,
+                u.display_name,
+                u.avatar_url,
+                COUNT(DISTINCT l.id) as like_count,
+                COUNT(DISTINCT r.id) as repost_count,
+                COUNT(DISTINCT rep.id) as reply_count,
+                ${current_user_id ? `
+                EXISTS(SELECT 1 FROM likes WHERE post_id = p.id AND user_id = $3) as user_liked,
+                EXISTS(SELECT 1 FROM reposts WHERE post_id = p.id AND user_id = $3) as user_reposted,
+                EXISTS(SELECT 1 FROM bookmarks WHERE post_id = p.id AND user_id = $3) as user_bookmarked,
+                ` : 'false as user_liked, false as user_reposted, false as user_bookmarked,'}
+                CASE WHEN p.reply_to_id IS NOT NULL THEN 
+                    json_build_object(
+                        'id', rp.id,
+                        'content', rp.content,
+                        'user_id', ru.id,
+                        'username', ru.username,
+                        'display_name', ru.display_name,
+                        'avatar_url', ru.avatar_url
+                    )
+                ELSE NULL END as replied_to_post
+            FROM posts p
+            JOIN users u ON p.user_id = u.id
+            LEFT JOIN posts rp ON p.reply_to_id = rp.id
+            LEFT JOIN users ru ON rp.user_id = ru.id
+            LEFT JOIN likes l ON p.id = l.post_id
+            LEFT JOIN reposts r ON p.id = r.post_id
+            LEFT JOIN replies rep ON p.id = rep.post_id
+            WHERE p.user_id = $1 AND p.reply_to_id IS NOT NULL
+            GROUP BY p.id, u.id, u.username, u.display_name, u.avatar_url, rp.id, ru.id, ru.username, ru.display_name, ru.avatar_url
+            ORDER BY p.created_at DESC
+            LIMIT $2 OFFSET ${current_user_id ? '$4' : '$3'}
+        `;
+
+        const params = current_user_id
+            ? [userId, parseInt(limit), current_user_id, parseInt(offset)]
+            : [userId, parseInt(limit), parseInt(offset)];
+
+        const result = await pool.query(query, params);
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Error fetching replies:', error);
+        res.status(500).json({ error: 'Failed to fetch replies' });
+    }
+});
+
 // POST /api/posts/:id/bookmark - Toggle bookmark on a post
 router.post('/posts/:id/bookmark', async (req, res) => {
     try {
@@ -1486,25 +2282,153 @@ router.post('/posts/:id/like', async (req, res) => {
     }
 });
 
+// DELETE /api/likes/:postId - Unlike a post
+router.delete('/likes/:postId', async (req, res) => {
+    try {
+        const { user_id } = req.body;
+        const post_id = parseInt(req.params.postId);
+
+        if (!user_id || !post_id) {
+            return res.status(400).json({ error: 'User ID and Post ID are required' });
+        }
+
+        // Remove like
+        await pool.query(
+            'DELETE FROM likes WHERE user_id = $1 AND post_id = $2',
+            [user_id, post_id]
+        );
+
+        res.json({ message: 'Post unliked successfully' });
+    } catch (error) {
+        console.error('Error unliking post:', error);
+        res.status(500).json({ error: 'Failed to unlike post' });
+    }
+});
+
+// POST /api/reposts - Repost a post
+router.post('/reposts', async (req, res) => {
+    try {
+        const { user_id, post_id } = req.body;
+
+        if (!user_id || !post_id) {
+            return res.status(400).json({ error: 'User ID and Post ID are required' });
+        }
+
+        // Check if already reposted
+        const existingRepost = await pool.query(
+            'SELECT id FROM reposts WHERE user_id = $1 AND post_id = $2',
+            [user_id, post_id]
+        );
+
+        if (existingRepost.rows.length > 0) {
+            return res.status(400).json({ error: 'Post already reposted' });
+        }
+
+        // Add repost
+        await pool.query(
+            'INSERT INTO reposts (user_id, post_id) VALUES ($1, $2)',
+            [user_id, post_id]
+        );
+
+        res.json({ message: 'Post reposted successfully' });
+    } catch (error) {
+        console.error('Error reposting post:', error);
+        res.status(500).json({ error: 'Failed to repost post' });
+    }
+});
+
+// DELETE /api/reposts/:postId - Unrepost a post
+router.delete('/reposts/:postId', async (req, res) => {
+    try {
+        const { user_id } = req.body;
+        const post_id = parseInt(req.params.postId);
+
+        if (!user_id || !post_id) {
+            return res.status(400).json({ error: 'User ID and Post ID are required' });
+        }
+
+        // Remove repost
+        await pool.query(
+            'DELETE FROM reposts WHERE user_id = $1 AND post_id = $2',
+            [user_id, post_id]
+        );
+
+        res.json({ message: 'Post unreposted successfully' });
+    } catch (error) {
+        console.error('Error unreposting post:', error);
+        res.status(500).json({ error: 'Failed to unrepost post' });
+    }
+});
+
+// POST /api/bookmarks - Bookmark a post
+router.post('/bookmarks', async (req, res) => {
+    try {
+        const { user_id, post_id } = req.body;
+
+        if (!user_id || !post_id) {
+            return res.status(400).json({ error: 'User ID and Post ID are required' });
+        }
+
+        // Check if already bookmarked
+        const existingBookmark = await pool.query(
+            'SELECT id FROM bookmarks WHERE user_id = $1 AND post_id = $2',
+            [user_id, post_id]
+        );
+
+        if (existingBookmark.rows.length > 0) {
+            return res.status(400).json({ error: 'Post already bookmarked' });
+        }
+
+        // Add bookmark
+        await pool.query(
+            'INSERT INTO bookmarks (user_id, post_id) VALUES ($1, $2)',
+            [user_id, post_id]
+        );
+
+        res.json({ message: 'Post bookmarked successfully' });
+    } catch (error) {
+        console.error('Error bookmarking post:', error);
+        res.status(500).json({ error: 'Failed to bookmark post' });
+    }
+});
+
+// DELETE /api/bookmarks/:postId - Unbookmark a post
+router.delete('/bookmarks/:postId', async (req, res) => {
+    try {
+        const { user_id } = req.body;
+        const post_id = parseInt(req.params.postId);
+
+        if (!user_id || !post_id) {
+            return res.status(400).json({ error: 'User ID and Post ID are required' });
+        }
+
+        // Remove bookmark
+        await pool.query(
+            'DELETE FROM bookmarks WHERE user_id = $1 AND post_id = $2',
+            [user_id, post_id]
+        );
+
+        res.json({ message: 'Post unbookmarked successfully' });
+    } catch (error) {
+        console.error('Error unbookmarking post:', error);
+        res.status(500).json({ error: 'Failed to unbookmark post' });
+    }
+});
+
 // GET /api/users/:id/bookmarks - Get user's bookmarked posts
 router.get('/users/:id/bookmarks', async (req, res) => {
     try {
         const { id } = req.params;
 
-        // Query to get posts from mutuals (users who follow you AND you follow them)
+        // Query to get bookmarked posts
         const query = `
-            WITH Mutuals AS (
-                SELECT f1.following_id as user_id
-                FROM follows f1
-                JOIN follows f2 ON f1.following_id = f2.follower_id
-                WHERE f1.follower_id = $1 AND f2.following_id = $1
-            )
             SELECT 
                 p.id,
                 p.content,
                 p.media_url,
                 p.media_type,
                 p.created_at,
+                p.parent_id,
                 u.id as user_id,
                 u.username,
                 u.display_name,
@@ -1513,19 +2437,40 @@ router.get('/users/:id/bookmarks', async (req, res) => {
                 COUNT(DISTINCT r.id) as repost_count,
                 COUNT(DISTINCT rep.id) as reply_count,
                 EXISTS(SELECT 1 FROM likes WHERE post_id = p.id AND user_id = $1) as user_liked,
-                EXISTS(SELECT 1 FROM reposts WHERE post_id = p.id AND user_id = $1) as user_reposted
-            FROM posts p
-            JOIN Mutuals m ON p.user_id = m.user_id
+                EXISTS(SELECT 1 FROM reposts WHERE post_id = p.id AND user_id = $1) as user_reposted,
+                EXISTS(SELECT 1 FROM bookmarks WHERE post_id = p.id AND user_id = $1) as user_bookmarked
+            FROM bookmarks b
+            JOIN posts p ON b.post_id = p.id
             JOIN users u ON p.user_id = u.id
             LEFT JOIN likes l ON p.id = l.post_id
             LEFT JOIN reposts r ON p.id = r.post_id
             LEFT JOIN replies rep ON p.id = rep.post_id
-            GROUP BY p.id, u.id, u.username, u.display_name, u.avatar_url
-            ORDER BY p.created_at DESC
+            WHERE b.user_id = $1
+            GROUP BY p.id, u.id, u.username, u.display_name, u.avatar_url, b.created_at
+            ORDER BY b.created_at DESC
             LIMIT 50
         `;
         const result = await pool.query(query, [id]);
-        res.json(result.rows);
+
+        // Generate proxy URLs for media (same as feed endpoint)
+        let posts = result.rows.map(post => {
+            if (post.media_url) {
+                try {
+                    const url = new URL(post.media_url);
+                    const pathParts = url.pathname.split('/').filter(p => p);
+                    if (pathParts.length >= 2) {
+                        const bucket = pathParts[0];
+                        const key = pathParts.slice(1).join('/');
+                        post.media_url = getProxyUrl(bucket, key);
+                    }
+                } catch (error) {
+                    console.error('Error generating proxy URL for bookmark:', error);
+                }
+            }
+            return post;
+        });
+
+        res.json(posts);
     } catch (error) {
         console.error('Error fetching bookmarks:', error);
         res.status(500).json({ error: 'Failed to fetch bookmarks' });
@@ -2940,4 +3885,248 @@ router.post('/interactions/track', async (req, res) => {
     }
 });
 
+// Configure multer for file uploads
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+        fileSize: 10 * 1024 * 1024, // 10MB limit
+    },
+    fileFilter: (req, file, cb) => {
+        if (file.mimetype.startsWith('image/')) {
+            cb(null, true);
+        } else {
+            cb(new Error('Only image files are allowed'));
+        }
+    }
+});
+
+// PUT /api/users/profile - Update user profile with file uploads
+router.put('/users/profile', upload.fields([
+    { name: 'avatar', maxCount: 1 },
+    { name: 'banner', maxCount: 1 }
+]), async (req, res) => {
+    try {
+        const { user_id, display_name, bio, location, website, username, email } = req.body;
+
+        if (!user_id) {
+            return res.status(400).json({ error: 'User ID is required' });
+        }
+
+        // Build update query dynamically based on provided fields
+        const updates = [];
+        const values = [];
+        let paramCount = 1;
+
+        if (display_name !== undefined) {
+            updates.push(`display_name = $${paramCount++}`);
+            values.push(display_name);
+        }
+
+        if (bio !== undefined) {
+            updates.push(`bio = $${paramCount++}`);
+            values.push(bio);
+        }
+
+        if (location !== undefined) {
+            updates.push(`location = $${paramCount++}`);
+            values.push(location);
+        }
+
+        if (website !== undefined) {
+            updates.push(`website = $${paramCount++}`);
+            values.push(website);
+        }
+
+        if (username !== undefined) {
+            // Check if username is already taken
+            const usernameCheck = await pool.query(
+                'SELECT id FROM users WHERE username = $1 AND id != $2',
+                [username, user_id]
+            );
+            if (usernameCheck.rows.length > 0) {
+                return res.status(409).json({ error: 'Username already taken' });
+            }
+            updates.push(`username = $${paramCount++}`);
+            values.push(username);
+        }
+
+        if (email !== undefined) {
+            // Check if email is already taken
+            const emailCheck = await pool.query(
+                'SELECT id FROM users WHERE email = $1 AND id != $2',
+                [email, user_id]
+            );
+            if (emailCheck.rows.length > 0) {
+                return res.status(409).json({ error: 'Email already taken' });
+            }
+            updates.push(`email = $${paramCount++}`);
+            values.push(email);
+        }
+
+        // Handle avatar upload
+        if (req.files && req.files['avatar']) {
+            const avatarFile = req.files['avatar'][0];
+
+            try {
+                const avatarUrl = await uploadToS3(
+                    avatarFile.buffer,
+                    BUCKETS.PROFILE_PICTURE,
+                    avatarFile.mimetype,
+                    `user-${user_id}-`
+                );
+                updates.push(`avatar_url = $${paramCount++}`);
+                values.push(avatarUrl);
+            } catch (uploadError) {
+                console.error('Avatar upload error:', uploadError);
+                return res.status(500).json({ error: 'Failed to upload avatar' });
+            }
+        }
+
+        // Handle banner upload
+        if (req.files && req.files['banner']) {
+            const bannerFile = req.files['banner'][0];
+
+            try {
+                const bannerUrl = await uploadToS3(
+                    bannerFile.buffer,
+                    BUCKETS.PROFILE_BANNER,
+                    bannerFile.mimetype,
+                    `user-${user_id}-`
+                );
+                updates.push(`banner_url = $${paramCount++}`);
+                values.push(bannerUrl);
+            } catch (uploadError) {
+                console.error('Banner upload error:', uploadError);
+                return res.status(500).json({ error: 'Failed to upload banner' });
+            }
+        }
+
+        if (updates.length === 0) {
+            return res.status(400).json({ error: 'No fields to update' });
+        }
+
+        // Add user_id as the last parameter
+        values.push(user_id);
+
+        // Execute update
+        const query = `
+            UPDATE users 
+            SET ${updates.join(', ')}, updated_at = CURRENT_TIMESTAMP
+            WHERE id = $${paramCount}
+            RETURNING id, username, display_name, email, avatar_url, banner_url, bio, location, website
+        `;
+
+        const result = await pool.query(query, values);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        const updatedUser = result.rows[0];
+
+        // Generate pre-signed URLs for avatar and banner (valid for 7 days)
+        if (updatedUser.avatar_url) {
+            try {
+                const url = new URL(updatedUser.avatar_url);
+                const pathParts = url.pathname.split('/').filter(p => p);
+                if (pathParts.length >= 2) {
+                    const bucket = pathParts[0];
+                    const key = pathParts.slice(1).join('/');
+                    updatedUser.avatar_url = getProxyUrl(bucket, key);
+                }
+            } catch (error) {
+                console.error('Error generating avatar proxy URL:', error);
+            }
+        }
+
+        if (updatedUser.banner_url) {
+            try {
+                const url = new URL(updatedUser.banner_url);
+                const pathParts = url.pathname.split('/').filter(p => p);
+                if (pathParts.length >= 2) {
+                    const bucket = pathParts[0];
+                    const key = pathParts.slice(1).join('/');
+                    updatedUser.banner_url = getProxyUrl(bucket, key);
+                }
+            } catch (error) {
+                console.error('Error generating banner proxy URL:', error);
+            }
+        }
+
+        res.json({
+            message: 'Profile updated successfully',
+            user: updatedUser
+        });
+
+    } catch (error) {
+        console.error('Error updating profile:', error);
+        res.status(500).json({ error: 'Failed to update profile' });
+    }
+});
+
+// GET /api/proxy/image - Proxy image from S3 or external URL
+router.get('/proxy/image', async (req, res) => {
+    try {
+        const { url } = req.query;
+        if (!url) {
+            return res.status(400).json({ error: 'URL is required' });
+        }
+
+        // Validate URL to prevent SSRF (basic check)
+        // In production, you should have a whitelist of allowed domains
+        if (!url.startsWith('http')) {
+            return res.status(400).json({ error: 'Invalid URL' });
+        }
+
+        // console.log('Proxying image:', url); // Uncomment for debugging
+
+        // Check if it's an internal S3 URL
+        const s3Endpoint = process.env.S3_ENDPOINT || 'http://192.168.178.199:3900';
+        if (url.includes(s3Endpoint) || url.includes('192.168.178.199:3900')) {
+            try {
+                const urlObj = new URL(url);
+                const pathParts = urlObj.pathname.split('/').filter(p => p);
+                if (pathParts.length >= 2) {
+                    const bucket = pathParts[0];
+                    const key = pathParts.slice(1).join('/');
+
+                    const fileStream = await getFileStream(bucket, key);
+
+                    // Determine content type
+                    const ext = key.split('.').pop().toLowerCase();
+                    let contentType = 'application/octet-stream';
+                    if (['jpg', 'jpeg'].includes(ext)) contentType = 'image/jpeg';
+                    else if (ext === 'png') contentType = 'image/png';
+                    else if (ext === 'gif') contentType = 'image/gif';
+                    else if (ext === 'webp') contentType = 'image/webp';
+                    else if (ext === 'mp4') contentType = 'video/mp4';
+
+                    res.setHeader('Content-Type', contentType);
+                    return fileStream.pipe(res);
+                }
+            } catch (s3Error) {
+                console.error('S3 Proxy Error:', s3Error);
+                // Fallback to axios if S3 fails (though likely to fail 403)
+            }
+        }
+
+        const response = await axios({
+            method: 'get',
+            url: url,
+            responseType: 'stream'
+        });
+
+        res.setHeader('Content-Type', response.headers['content-type']);
+        response.data.pipe(res);
+    } catch (error) {
+        console.error(`Error proxying image (${req.query.url}):`, error.message);
+        if (error.response) {
+            // console.error('Response status:', error.response.status);
+            // console.error('Response data:', error.response.data);
+        }
+        res.status(500).json({ error: 'Failed to proxy image' });
+    }
+});
+
 module.exports = { router, setPool };
+

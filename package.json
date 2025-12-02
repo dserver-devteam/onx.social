@@ -1,16 +1,18 @@
 {
-  "name": "n-social",
+  "name": "realtalk-now",
   "version": "1.0.0",
-  "description": "A modern social media platform with dark theme and blue accents",
+  "description": "RealTalk - A modern social media platform for authentic conversations",
   "main": "server.js",
   "scripts": {
     "start": "concurrently \"node server.js\" \"node admin-server.js\" \"node support-server.js\"",
-    "dev": "concurrently \"node server.js\" \"node admin-server.js\" \"node support-server.js\" \"node llm-dashboard-server.js\" \"node llm-processor.js\"",
+    "dev": "concurrently \"node server.js\" \"node admin-server.js\" \"node support-server.js\"",
     "dev:main": "node server.js",
     "dev:admin": "node admin-server.js",
     "dev:support": "node support-server.js",
     "dev:llm": "node llm-dashboard-server.js",
-    "dev:processor": "node llm-processor.js"
+    "dev:processor": "node llm-processor.js",
+    "admin": "node scripts/admin-cli.js",
+    "task": "node tasks.js"
   },
   "keywords": [
     "social",

@@ -1,6 +1,6 @@
-# ONX Social
+# RealTalk
 
-A modern, full-stack social media platform with a stunning dark theme and vibrant blue accents.
+A modern, full-stack social media platform for authentic conversations with a stunning dark theme and vibrant blue accents.
 
 ## 🚀 Features
 
@@ -125,7 +125,7 @@ deploy-dserver/
 ## 🎯 Key Features
 
 ### Navigation Sidebar
-- ONX Social branding with gradient logo
+- RealTalk branding with gradient logo
 - Home, Explore, Notifications, Messages, Bookmarks, Profile
 - Compose post button
 - User profile card

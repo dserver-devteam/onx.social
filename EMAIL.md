@@ -2,7 +2,7 @@
 
 ## Overview
 
-ONX Social now includes email functionality using Nodemailer with SMTP configuration for sending notifications and welcome emails.
+RealTalk now includes email functionality using Nodemailer with SMTP configuration for sending notifications and welcome emails.
 
 ## Configuration
 
@@ -28,10 +28,10 @@ EMAIL_FROM=noreply@dserver-team.com
 ## Email Templates
 
 ### 1. Welcome Email
-Sent when a new user joins ONX Social.
+Sent when a new user joins RealTalk.
 
 **Features:**
-- ONX Social branding with gradient logo
+- RealTalk branding with gradient logo
 - Dark theme matching the app
 - Call-to-action button
 - Responsive HTML design

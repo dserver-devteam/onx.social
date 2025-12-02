@@ -51,9 +51,8 @@ function setupEventListeners() {
 async function handleLogin(e) {
     e.preventDefault();
 
-    const code1 = document.getElementById('code1').value;
-    const code2 = document.getElementById('code2').value;
-    const code3 = document.getElementById('code3').value;
+    const username = document.getElementById('username').value;
+    const password = document.getElementById('password').value;
     const errorDiv = document.getElementById('loginError');
 
     try {
@@ -62,7 +61,7 @@ async function handleLogin(e) {
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ code1, code2, code3 })
+            body: JSON.stringify({ username, password })
         });
 
         const data = await response.json();

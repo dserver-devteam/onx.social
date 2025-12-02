@@ -79,28 +79,24 @@ setLLMPool(pool);
 
 // Middleware
 app.use(cors());
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
+app.use(bodyParser.json({ limit: '50mb' }));
+app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 
 // Analytics middleware (tracks page views automatically)
 app.use(analyticsMiddleware);
 
 // Serve static files with cache control
-app.use(express.static(path.join(__dirname), {
-    setHeaders: (res, path) => {
-        // Disable caching for JS and CSS files to ensure latest version is always loaded
-        if (path.endsWith('.js') || path.endsWith('.css')) {
-            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-            res.setHeader('Pragma', 'no-cache');
-            res.setHeader('Expires', '0');
-        }
-    }
-}));
+// Serve static files from React build
+app.use(express.static(path.join(__dirname, 'frontend/dist')));
+
+// Serve uploads if they exist locally
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // API routes
 app.use('/api', apiRouter);
 app.use('/auth', authRouter);
 app.use('/upload', require('./routes/upload'));
+app.use('/api/proxy', require('./routes/proxy'));
 
 // Channels routes with pool middleware
 const channelsRouter = require('./routes/channels');
@@ -109,45 +105,34 @@ app.use('/api', (req, res, next) => {
     next();
 }, channelsRouter);
 
+// Stories routes with pool middleware
+const storiesRouter = require('./routes/stories');
+app.use('/api', (req, res, next) => {
+    req.pool = pool;
+    next();
+}, storiesRouter);
+
+// Trending routes with pool middleware
+const trendingRouter = require('./routes/trending');
+app.use('/api', (req, res, next) => {
+    req.pool = pool;
+    next();
+}, trendingRouter);
+
+// Messages routes with pool middleware
+const { router: messagesRouter, setPool: setMessagesPool } = require('./routes/messages');
+setMessagesPool(pool);
+app.use('/api/messages', messagesRouter);
+
+
 // Serve index.html for root route
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
-});
-
-// Auth routes (Frontend)
-app.get('/login', (req, res) => {
-    res.sendFile(path.join(__dirname, 'login.html'));
-});
-
-app.get('/register', (req, res) => {
-    res.sendFile(path.join(__dirname, 'register.html'));
-});
-
-app.get('/verify-email', (req, res) => {
-    res.sendFile(path.join(__dirname, 'verify-email.html'));
-});
-
-app.get('/forgot-password', (req, res) => {
-    res.sendFile(path.join(__dirname, 'forgot-password.html'));
-});
-
-app.get('/reset-password', (req, res) => {
-    res.sendFile(path.join(__dirname, 'reset-password.html'));
-});
-
-// Post detail route
-app.get('/post/:id', (req, res) => {
-    res.sendFile(path.join(__dirname, 'post.html'));
-});
-
-// Profile route
-app.get('/profile/:username', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
-});
-
-// Hashtag route
-app.get('/hashtag/:tag', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
+// SPA Fallback - Serve index.html for all other routes
+app.get('*', (req, res) => {
+    // Don't intercept API routes (though they should be handled above)
+    if (req.path.startsWith('/api') || req.path.startsWith('/auth')) {
+        return res.status(404).json({ error: 'Not found' });
+    }
+    res.sendFile(path.join(__dirname, 'frontend/dist/index.html'));
 });
 
 // Error handling middleware
@@ -158,7 +143,7 @@ app.use((err, req, res, next) => {
 
 // Start server
 app.listen(PORT, () => {
-    console.log(`🚀 ONX Social server running on http://localhost:${PORT}`);
+    console.log(`🚀 RealTalk server running on http://localhost:${PORT}`);
     console.log(`📊 Database: ${process.env.DB_NAME}`);
 });
 

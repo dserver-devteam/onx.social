@@ -32,7 +32,7 @@ app.use(express.static(path.join(__dirname, 'admin')));
 // ===== PUBLIC ROUTES =====
 
 // Login endpoint
-app.post('/api/admin/login', (req, res) => adminLogin(req, res));
+app.post('/api/admin/login', (req, res) => adminLogin(pool, req, res));
 
 // ===== PROTECTED ROUTES =====
 
