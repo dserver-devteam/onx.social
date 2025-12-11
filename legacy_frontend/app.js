@@ -1,3 +1,4 @@
+# Legacy 1.0
 // API Base URL
 const API_BASE = '/api';
 
